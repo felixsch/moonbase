@@ -50,8 +50,11 @@ instance (Monoid a) => Monoid (Moonbase a) where
 
 class WindowManagerClass a where
     startWM :: a -> Moonbase ()
-    stopWM :: a -> Moonbase ()
+    stopWM ::  a -> Moonbase ()
 
+instance WindowManagerClass WindowManager where
+    startWM (WindowManager wm) = startWM wm
+    stopWM (WindowManager wm)  = stopWM wm
 
 data WindowManager = forall a. (WindowManagerClass a) => WindowManager a
 
@@ -85,8 +88,6 @@ registerDBusQuit = do
         where
             runQuit = trigger . quit
 
-
-
 moonbase :: MoonConfig -> IO ()
 moonbase
     conf = do
@@ -97,7 +98,8 @@ moonbase
                 Left err -> handleError err
                 Right _  -> putStrLn "Bye.."
     where
-        exec = registerDBusQuit <> mainLoop
+        exec = registerDBusQuit <> startWM' <> mainLoop
+        startWM' = startWM . windowManager =<< ask
         mainLoop = do
             st <- get
             io $ waitUntil (quit st)

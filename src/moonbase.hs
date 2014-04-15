@@ -10,8 +10,8 @@ import Moonbase.Core
 
 data DummyWM = DummyWM String
 instance WindowManagerClass DummyWM where
-    startWM _ = io $ putStrLn "Start dummyWM"
-    stopWM  _ = io $ putStrLn "Stop dummyWM"
+    startWM (DummyWM n) = io $ putStrLn $ "Start dummyWM: " ++ n
+    stopWM  (DummyWM n) = io $ putStrLn $ "Stop dummyWM: " ++ n
 
 defaultConfig :: MoonConfig 
 defaultConfig
