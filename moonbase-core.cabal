@@ -52,9 +52,11 @@ cabal-version:       >=1.10
 library
   exposed-modules:    Moonbase
                     , Moonbase.Core
+                    , Moonbase.Util.Trigger
 
   build-depends:      base >=4.6 && <4.7
                     , mtl >= 2.1.2
+                    , dbus >= 0.10.7
   
   hs-source-dirs:     src/
   
@@ -74,8 +76,8 @@ executable moonbase
   
   -- Other library packages from which modules are imported.
   build-depends:      base >=4.6 && <4.7
-                    , mtl >= 2.1.2
-  
+                    , mtl  >= 2.1.2
+                    , dbus >= 0.7.10
   -- Directories containing source files.
   hs-source-dirs:    src/
   
