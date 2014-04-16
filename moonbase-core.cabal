@@ -52,11 +52,16 @@ cabal-version:       >=1.10
 library
   exposed-modules:    Moonbase
                     , Moonbase.Core
+                    , Moonbase.WindowManager
+                    , Moonbase.WindowManager.Generic
                     , Moonbase.Util.Trigger
+                    , Moonbase.Util.Application
 
   build-depends:      base >=4.6 && <4.7
                     , mtl >= 2.1.2
-                    , dbus >= 0.10.7
+                    , dbus >= 0.10.7 
+                    , directory >= 1.2.1.0
+                    , process >= 1.1.0.2
   
   hs-source-dirs:     src/
   
@@ -78,6 +83,9 @@ executable moonbase
   build-depends:      base >=4.6 && <4.7
                     , mtl  >= 2.1.2
                     , dbus >= 0.7.10
+                    , directory >= 1.2.1.0
+                    , process >= 1.1.0.2
+
   -- Directories containing source files.
   hs-source-dirs:    src/
   

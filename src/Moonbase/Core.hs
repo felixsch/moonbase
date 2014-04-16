@@ -1,7 +1,14 @@
-{-# LANGUAGE ExistentialQuantification, FlexibleInstances, GeneralizedNewtypeDeriving,
-MultiParamTypeClasses, TypeSynonymInstances, DeriveDataTypeable, OverloadedStrings#-}
+{-# LANGUAGE ExistentialQuantification, GeneralizedNewtypeDeriving #-}
 
-module Moonbase.Core where
+module Moonbase.Core
+    ( MoonState(..)
+    , MoonConfig(..)
+    , MoonError(..)
+    , Moonbase(..)
+    , runMoon, io
+    , WindowManagerClass(..)
+    , WindowManager(..)
+    ) where
 
 
 
@@ -21,6 +28,7 @@ import Moonbase.Util.Trigger
 data MoonState = MoonState
   { quit :: Trigger
   , dbus :: Client
+  , wm   :: Maybe WindowManager
   }
 
 
@@ -36,8 +44,9 @@ instance Error MoonError where
     noMsg  = ErrorMessage "Unknown Error"
     strMsg = ErrorMessage
 
+
 newtype Moonbase a = Moonbase (ReaderT MoonConfig (StateT MoonState ( ErrorT MoonError IO)) a)
-    deriving (Functor, Monad, MonadIO, MonadState MoonState, MonadReader MoonConfig)
+    deriving (Functor, Monad, MonadIO, MonadState MoonState, MonadReader MoonConfig, MonadError MoonError)
 
 instance Applicative Moonbase where
     pure    = return
@@ -49,12 +58,12 @@ instance (Monoid a) => Monoid (Moonbase a) where
 
 
 class WindowManagerClass a where
-    startWM :: a -> Moonbase ()
+    startWM :: a -> Moonbase a
     stopWM ::  a -> Moonbase ()
 
 instance WindowManagerClass WindowManager where
-    startWM (WindowManager wm) = startWM wm
-    stopWM (WindowManager wm)  = stopWM wm
+    startWM (WindowManager w) = WindowManager <$> startWM w
+    stopWM (WindowManager w)  = stopWM w
 
 data WindowManager = forall a. (WindowManagerClass a) => WindowManager a
 
@@ -71,38 +80,3 @@ io
 
 
 
-startDbusSession :: IO Client
-startDbusSession 
-    = do
-        client <- connectSession
-        name   <- requestName client "org.Moonbase" []
-        case name of
-            NamePrimaryOwner -> return client
-            _                -> error "Connection to Session Bus failed. Name allready in use"
-
-
-registerDBusQuit :: Moonbase ()
-registerDBusQuit = do
-            st <- get
-            io $ export (dbus st) "/org/moonbase" [ autoMethod "org.Moonbase.Core" "Quit" (runQuit st)]
-        where
-            runQuit = trigger . quit
-
-moonbase :: MoonConfig -> IO ()
-moonbase
-    conf = do
-            client <- startDbusSession
-            q <- newTrigger
-            re <- runMoon conf (MoonState q client) exec
-            case re of
-                Left err -> handleError err
-                Right _  -> putStrLn "Bye.."
-    where
-        exec = registerDBusQuit <> startWM' <> mainLoop
-        startWM' = startWM . windowManager =<< ask
-        mainLoop = do
-            st <- get
-            io $ waitUntil (quit st)
-        handleError (ErrorMessage err) = putStrLn $ "Error: " ++ err
-        handleError _                  = putStrLn "Unknown Error"
-            

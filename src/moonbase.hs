@@ -6,17 +6,18 @@ import System.IO
 
 import Moonbase
 import Moonbase.Core
+import Moonbase.WindowManager.Generic
 
 
-data DummyWM = DummyWM String
-instance WindowManagerClass DummyWM where
-    startWM (DummyWM n) = io $ putStrLn $ "Start dummyWM: " ++ n
-    stopWM  (DummyWM n) = io $ putStrLn $ "Stop dummyWM: " ++ n
+openbox :: [String] -> WindowManager
+openbox args = WindowManager $ GenericWM "openbox" args Nothing
+
+
 
 defaultConfig :: MoonConfig 
 defaultConfig
     = MoonConfig
-    { windowManager = WindowManager $ DummyWM "testing"
+    { windowManager = openbox []
     }
 
 main :: IO ()
