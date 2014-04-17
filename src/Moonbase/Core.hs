@@ -11,8 +11,11 @@ module Moonbase.Core
     ) where
 
 import System.IO
+import System.Locale (defaultTimeLocale, rfc822DateFormat)
 
 import Data.Monoid
+import Data.Time.Clock (getCurrentTime)
+import Data.Time.Format (formatTime)
 
 import Control.Applicative
 
@@ -22,26 +25,9 @@ import Control.Monad.Error
 
 import DBus.Client
 
+import Moonbase.Log
 import Moonbase.Util.Trigger
 
-data LogTag = ErrorTag
-            | InfoTag
-            | WarningTag
-            | CustomTag String
-            deriving (Show, Eq)
-
-
-class (Monad m) => Logger m where
-    logM :: LogTag -> String -> m ()
-
-    errorM :: String -> m ()
-    errorM = logM ErrorTag
-
-    infoM :: String -> m ()
-    infoM = logM InfoTag
-
-    warnM :: String -> m ()
-    warnM = logM WarningTag
 
 data MoonState = MoonState
   { quit   :: Trigger
@@ -76,9 +62,10 @@ instance (Monoid a) => Monoid (Moonbase a) where
     mappend = liftM2 mappend
 
 instance Logger Moonbase where
-    logM ErrorTag msg = do
+    logM tag msg = do
         hdl <- logHdl <$> get
-        io $ hPutStrLn hdl ("Error : " ++ msg)
+        date <- io $ formatTime defaultTimeLocale rfc822DateFormat <$> getCurrentTime
+        io $ hPutStrLn hdl ("[" ++ date ++ "] " ++ show tag ++ ": " ++ msg) >> hFlush hdl
 
 class WindowManagerClass a where
     startWM :: a -> Moonbase a

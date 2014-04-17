@@ -52,6 +52,7 @@ cabal-version:       >=1.10
 library
   exposed-modules:    Moonbase
                     , Moonbase.Core
+                    , Moonbase.Log
                     , Moonbase.WindowManager
                     , Moonbase.WindowManager.Generic
                     , Moonbase.Util.Trigger
@@ -63,6 +64,7 @@ library
                     , directory >= 1.2.1.0
                     , process >= 1.1.0.2
                     , time >= 1.4.2
+                    , old-locale >= 1.0.0.5
                     , xdg >= 0.1.0.0
   
   hs-source-dirs:     src/
@@ -88,6 +90,7 @@ executable moonbase
                     , directory >= 1.2.1.0
                     , process >= 1.1.0.2
                     , time >= 1.4.2
+                    , old-locale >= 1.0.0.5
                     , xdg >= 0.1.0.0
 
   -- Directories containing source files.

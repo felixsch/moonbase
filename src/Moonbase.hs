@@ -18,13 +18,19 @@ import System.Environment.XDG.BaseDir
 
 import Moonbase.Util.Trigger
 
-import Moonbase.WindowManager
 import Moonbase.Core
+import Moonbase.Log
+import Moonbase.WindowManager
 
 
+moonHome :: IO FilePath
+moonHome = do
+    dir <- getUserConfigDir
+    return $ dir ++ "/moonbase/"
 
-startDbusSession :: IO Client
-startDbusSession 
+
+startDbus :: IO Client
+startDbus 
     = do
         client <- connectSession
         name   <- requestName client "org.Moonbase" []
@@ -44,8 +50,8 @@ registerDBusQuit = do
 openLog :: IO Handle
 openLog
     = do
-     dir <- getUserConfigDir
-     openFile (dir ++ "/moonbase.log") WriteMode
+     dir <- moonHome
+     openFile (dir ++ "moonbase.log") WriteMode
 
         
 newMoonState :: Client -> Handle -> IO MoonState
@@ -61,16 +67,16 @@ newMoonState
 
 startMoonbase :: Moonbase ()
 startMoonbase
-    = registerDBusQuit >> startWindowManager
+    = infoM "Starting moonbase..." >> registerDBusQuit >> startWindowManager
 
 stopMoonbase :: Moonbase ()
 stopMoonbase
-    = stopWindowManager
+    = stopWindowManager >> infoM "Stoping moonbase..."
 
 moonbase :: MoonConfig -> IO ()
 moonbase
     conf = do
-            client <- startDbusSession
+            client <- startDbus
             l <- openLog
             st <- newMoonState client l
             re <- runMoon conf st exec
