@@ -1,4 +1,9 @@
-module Moonbase.Util.Application where
+module Moonbase.Util.Application 
+    ( Application
+    , Argument
+    , findApp
+    , spawn
+    ) where
 
 import Control.Monad.Error
 
@@ -17,7 +22,7 @@ findApp :: Application -> Moonbase FilePath
 findApp
     app = check =<< io (findExecutable app)
     where
-        check (Nothing) = throwError (ErrorMessage $ "Could not find Application `" ++ app ++ "`")
+        check (Nothing) = throwError $ AppNotFound app
         check (Just x)  = return x 
 
 

@@ -13,6 +13,9 @@ import Control.Monad.Error
 
 import DBus.Client
 
+import System.IO
+import System.Environment.XDG.BaseDir
+
 import Moonbase.Util.Trigger
 
 import Moonbase.WindowManager
@@ -37,6 +40,25 @@ registerDBusQuit = do
         where
             runQuit = trigger . quit
 
+
+openLog :: IO Handle
+openLog
+    = do
+     dir <- getUserConfigDir
+     openFile (dir ++ "/moonbase.log") WriteMode
+
+        
+newMoonState :: Client -> Handle -> IO MoonState
+newMoonState
+    client hdl = do
+        q <- newTrigger
+        return MoonState
+            { quit   = q
+            , dbus   = client
+            , wm     = Nothing
+            , logHdl = hdl
+            }
+
 startMoonbase :: Moonbase ()
 startMoonbase
     = registerDBusQuit >> startWindowManager
@@ -49,8 +71,9 @@ moonbase :: MoonConfig -> IO ()
 moonbase
     conf = do
             client <- startDbusSession
-            q <- newTrigger
-            re <- runMoon conf (MoonState q client Nothing) exec
+            l <- openLog
+            st <- newMoonState client l
+            re <- runMoon conf st exec
             case re of
                 Left err -> handleError err
                 Right _  -> putStrLn "Bye.."
@@ -60,6 +83,7 @@ moonbase
             st <- get
             io $ waitUntil (quit st)
         handleError (ErrorMessage err) = putStrLn $ "Error: " ++ err
+        handleError (AppNotFound app)  = putStrLn $ "APP NOT FOUND: " ++ app
         handleError _                  = putStrLn "Unknown Error"
             
 
