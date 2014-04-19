@@ -5,11 +5,10 @@ module Moonbase
 
 
 
-import Control.Applicative
 
-import Control.Monad.Reader
 import Control.Monad.State
-import Control.Monad.Error
+
+import qualified Data.Map as M
 
 import DBus.Client
 
@@ -20,6 +19,7 @@ import Moonbase.Util.Trigger
 
 import Moonbase.Core
 import Moonbase.Log
+import Moonbase.Service
 import Moonbase.WindowManager
 
 
@@ -63,15 +63,16 @@ newMoonState
             , dbus   = client
             , wm     = Nothing
             , logHdl = hdl
+            , services = M.empty
             }
 
 startMoonbase :: Moonbase ()
 startMoonbase
-    = infoM "Starting moonbase..." >> registerDBusQuit >> startWindowManager
+    = infoM "Starting moonbase..." >> registerDBusQuit >> startWindowManager >> startServices
 
 stopMoonbase :: Moonbase ()
 stopMoonbase
-    = stopWindowManager >> infoM "Stoping moonbase..."
+    = stopServices >> stopWindowManager >> infoM "Stoping moonbase..."
 
 moonbase :: MoonConfig -> IO ()
 moonbase

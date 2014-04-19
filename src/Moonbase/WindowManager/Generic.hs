@@ -1,4 +1,6 @@
-module Moonbase.WindowManager.Generic where
+module Moonbase.WindowManager.Generic
+    ( GenericWM(..)
+    ) where
 
 import Control.Applicative
 import System.Process

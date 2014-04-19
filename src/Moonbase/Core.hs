@@ -8,6 +8,8 @@ module Moonbase.Core
     , runMoon, io
     , WindowManagerClass(..)
     , WindowManager(..)
+    , StartStop(..), Enable(..)
+    , Service(..)
     ) where
 
 import System.IO
@@ -16,6 +18,7 @@ import System.Locale (defaultTimeLocale, rfc822DateFormat)
 import Data.Monoid
 import Data.Time.Clock (getCurrentTime)
 import Data.Time.Format (formatTime)
+import qualified Data.Map as M
 
 import Control.Applicative
 
@@ -34,11 +37,13 @@ data MoonState = MoonState
   , dbus   :: Client
   , wm     :: Maybe WindowManager
   , logHdl :: Handle
+  , services :: M.Map String Service
   }
 
 
 data MoonConfig = MoonConfig 
     { windowManager :: WindowManager 
+    , autostart     :: [Service]
     }
 
 data MoonError = ErrorMessage String
@@ -61,6 +66,7 @@ instance (Monoid a) => Monoid (Moonbase a) where
     mempty = return mempty
     mappend = liftM2 mappend
 
+
 instance Logger Moonbase where
     logM tag msg = do
         hdl <- logHdl <$> get
@@ -76,6 +82,35 @@ instance WindowManagerClass WindowManager where
     stopWM (WindowManager w)  = stopWM w
 
 data WindowManager = forall a. (WindowManagerClass a) => WindowManager a
+
+
+
+class StartStop a where
+    startService :: a -> Moonbase a
+    stopService :: a -> Moonbase ()
+
+    restartService :: a -> Moonbase a
+    restartService = stopService >> startService
+
+    isRunning :: a -> Moonbase Bool
+    isRunning _ = return True
+
+instance StartStop Service where
+    startService (Service n a) = Service n <$> startService a
+    stopService  (Service _ a) = stopService a
+
+    restartService (Service n a) = Service n <$> restartService a
+
+
+class Enable a where
+    enableService :: a -> Moonbase ()
+
+instance Enable Service where
+    enableService (OneShot _ a) = enableService a
+    
+data Service = forall a. (StartStop a) => Service String a
+             | forall a. (Enable a) =>    OneShot String a
+
 
  
 runMoon :: MoonConfig -> MoonState -> Moonbase a -> IO (Either MoonError (a, MoonState))
