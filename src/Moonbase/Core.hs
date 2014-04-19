@@ -10,10 +10,13 @@ module Moonbase.Core
     , WindowManager(..)
     , StartStop(..), Enable(..)
     , Service(..)
+    , Preferred(..)
     ) where
 
 import System.IO
 import System.Locale (defaultTimeLocale, rfc822DateFormat)
+import System.Environment.XDG.DesktopEntry
+import System.Environment.XDG.MimeApps
 
 import Data.Monoid
 import Data.Time.Clock (getCurrentTime)
@@ -27,6 +30,7 @@ import Control.Monad.State
 import Control.Monad.Error
 
 import DBus.Client
+
 
 import Moonbase.Log
 import Moonbase.Util.Trigger
@@ -44,6 +48,7 @@ data MoonState = MoonState
 data MoonConfig = MoonConfig 
     { windowManager :: WindowManager 
     , autostart     :: [Service]
+    , preferred      :: M.Map String Preferred
     }
 
 data MoonError = ErrorMessage String
@@ -110,6 +115,10 @@ instance Enable Service where
     
 data Service = forall a. (StartStop a) => Service String a
              | forall a. (Enable a) =>    OneShot String a
+
+
+data Preferred = Entry DesktopEntry
+              | AppName String
 
 
  

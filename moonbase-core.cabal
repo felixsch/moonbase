@@ -57,6 +57,7 @@ library
                     , Moonbase.Service.Generic
                     , Moonbase.WindowManager
                     , Moonbase.WindowManager.Generic
+                    , Moonbase.Preferred
                     , Moonbase.Util.Trigger
                     , Moonbase.Util.Application
 

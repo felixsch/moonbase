@@ -2,7 +2,7 @@
 
 
 import System.IO
-
+import qualified Data.Map as M
 
 import Moonbase
 import Moonbase.Core
@@ -17,6 +17,10 @@ openbox args = WindowManager $ GenericWM "openbox" args Nothing
 xfcePanel :: Service
 xfcePanel = Service "xfce4panel" $ GenericService "xfce4-panel" [] Nothing
 
+samplePreferred :: M.Map String Preferred
+samplePreferred
+    = M.fromList
+        [ ("image/png", AppName "gimp") ]
 
 
 defaultConfig :: MoonConfig 
@@ -24,6 +28,7 @@ defaultConfig
     = MoonConfig
     { windowManager = openbox []
     , autostart = [xfcePanel]
+    , preferred = samplePreferred
     }
 
 main :: IO ()

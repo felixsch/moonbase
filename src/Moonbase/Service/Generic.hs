@@ -1,6 +1,6 @@
 module Moonbase.Service.Generic where
 
-
+import Control.Monad (void)
 import Control.Applicative
 import System.Process
 
@@ -34,3 +34,9 @@ isGenericServiceRunning
 isGenericServiceRunning
     _                              = return False
 
+
+
+data GenericOneShot = GenericOneShot String [String]
+
+instance Enable GenericOneShot where
+    enableService (GenericOneShot cmd args) = void $ spawn cmd args
