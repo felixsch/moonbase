@@ -20,6 +20,7 @@ import Moonbase.Util.Trigger
 import Moonbase.Core
 import Moonbase.Log
 import Moonbase.Service
+import Moonbase.Preferred
 import Moonbase.WindowManager
 
 
@@ -68,7 +69,7 @@ newMoonState
 
 startMoonbase :: Moonbase ()
 startMoonbase
-    = infoM "Starting moonbase..." >> registerDBusQuit >> startWindowManager >> startServices
+    = infoM "Starting moonbase..." >> registerDBusQuit >> setPreferred >> startWindowManager >> startServices
 
 stopMoonbase :: Moonbase ()
 stopMoonbase

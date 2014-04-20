@@ -20,7 +20,7 @@ xfcePanel = Service "xfce4panel" $ GenericService "xfce4-panel" [] Nothing
 samplePreferred :: M.Map String Preferred
 samplePreferred
     = M.fromList
-        [ ("image/png", AppName "gimp") ]
+        [ ("image/png", AppName "ristretto") ]
 
 
 defaultConfig :: MoonConfig 
