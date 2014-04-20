@@ -91,7 +91,7 @@ moonbase
             st <- get
             io $ waitUntil (quit st)
         handleError (ErrorMessage err) = putStrLn $ "Error: " ++ err
-        handleError (AppNotFound app)  = putStrLn $ "APP NOT FOUND: " ++ app
+        handleError (AppNotFound a)  = putStrLn $ "APP NOT FOUND: " ++ a
         handleError _                  = putStrLn "Unknown Error"
             
 

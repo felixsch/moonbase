@@ -16,7 +16,6 @@ module Moonbase.Core
 import System.IO
 import System.Locale (defaultTimeLocale, rfc822DateFormat)
 import System.Environment.XDG.DesktopEntry
-import System.Environment.XDG.MimeApps
 
 import Data.Monoid
 import Data.Time.Clock (getCurrentTime)
