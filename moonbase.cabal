@@ -2,7 +2,7 @@
 -- documentation, see http://haskell.org/cabal/users-guide/
 
 -- The name of the package.
-name:                moonbase-core
+name:                moonbase
 
 -- The package version.  See the Haskell package versioning policy (PVP) 
 -- for standards guiding when and how versions should be incremented.
@@ -19,7 +19,7 @@ synopsis:            Simple desktop environment
 -- description:         
 
 -- URL for the project homepage or repository.
-homepage:            github.com/felixsch/moonbase-core
+homepage:            github.com/felixsch/moonbase
 
 -- The license under which the package is released.
 license:             GPL-2
