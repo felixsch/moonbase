@@ -22,6 +22,7 @@ import Moonbase.Log
 import Moonbase.Service
 import Moonbase.Preferred
 import Moonbase.WindowManager
+import Moonbase.Desktop
 
 
 moonHome :: IO FilePath
@@ -63,17 +64,18 @@ newMoonState
             { quit   = q
             , dbus   = client
             , wm     = Nothing
+            , desk   = Nothing
             , logHdl = hdl
             , services = M.empty
             }
 
 startMoonbase :: Moonbase ()
 startMoonbase
-    = infoM "Starting moonbase..." >> registerDBusQuit >> setPreferred >> startWindowManager >> startServices
+    = infoM "Starting moonbase..." >> registerDBusQuit >> setPreferred >> startDesktop >> startWindowManager >> startServices
 
 stopMoonbase :: Moonbase ()
 stopMoonbase
-    = stopServices >> stopWindowManager >> infoM "Stoping moonbase..."
+    = stopServices >> stopWindowManager >> stopDesktop >> infoM "Stoping moonbase..."
 
 moonbase :: MoonConfig -> IO ()
 moonbase

@@ -6,20 +6,26 @@ import qualified Data.Map as M
 import Moonbase
 import Moonbase.Core
 import Moonbase.Preferred (app)
-import Moonbase.WindowManager.Generic (GenericWM(..))
-import Moonbase.Service.Generic (GenericService(..))
+import Moonbase.WindowManager.Generic
+import Moonbase.Service.Generic
+import Moonbase.Desktop.Generic
 
 
 openbox :: [String] -> WindowManager
-openbox args = WindowManager $ GenericWM "openbox" args Nothing
+openbox = newGenericWM "openbox"
 
 xfcePanel :: Service
-xfcePanel = Service "xfce4panel" $ GenericService "xfce4-panel" [] Nothing
+xfcePanel = newGenericService "xfce4-panel" []
 
 samplePreferred :: M.Map String Preferred
 samplePreferred
     = M.fromList
         [ ("image/png", app "gimp") ]
+
+setRoot :: String -> Desktop
+setRoot 
+    color = newGenericDesktop "xsetroot" ["-bg", color]
+
 
 
 defaultConfig :: MoonConfig 
@@ -28,6 +34,8 @@ defaultConfig
     { windowManager = openbox []
     , autostart = [xfcePanel]
     , preferred = samplePreferred
+    , desktop   = setRoot "#ff0000"
+    
     }
 
 main :: IO ()

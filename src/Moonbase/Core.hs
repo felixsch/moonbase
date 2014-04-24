@@ -6,11 +6,11 @@ module Moonbase.Core
     , MoonError(..)
     , Moonbase(..)
     , runMoon, io
-    , WindowManagerClass(..)
     , WindowManager(..)
     , StartStop(..), Enable(..)
     , Service(..)
     , Preferred(..)
+    , Desktop(..)
     ) where
 
 import System.IO
@@ -34,25 +34,30 @@ import DBus.Client
 import Moonbase.Log
 import Moonbase.Util.Trigger
 
-
+-- | Moonbase basic read write state
 data MoonState = MoonState
-  { quit   :: Trigger
-  , dbus   :: Client
-  , wm     :: Maybe WindowManager
-  , logHdl :: Handle
-  , services :: M.Map String Service
+  { quit   :: Trigger                   -- ^ MVar to triggere the quit event
+  , dbus   :: Client                    -- ^ The core moonbase dbus session
+  , wm     :: Maybe WindowManager       -- ^ Windowmanager implementation is saved here
+  , desk   :: Maybe Desktop
+  , logHdl :: Handle                    -- ^ FileHandle to logfile
+  , services :: M.Map String Service    -- ^ All started services
   }
 
-
+-- | Moonbase user configuration
+-- Every user should create his own configuration as he needs
 data MoonConfig = MoonConfig 
-    { windowManager :: WindowManager 
-    , autostart     :: [Service]
-    , preferred      :: M.Map String Preferred
+    { windowManager :: WindowManager            -- ^ Windowmanager definition 
+    , autostart     :: [Service]                -- ^ Many services which should be started
+    , preferred      :: M.Map String Preferred  -- ^ A map of preffered applications for each mimetype
+    , desktop :: Desktop
     }
 
-data MoonError = ErrorMessage String
-               | AppNotFound String
-               | Quit
+-- | Error types for the ErrorT instance
+data MoonError = ErrorMessage String  -- ^ generic Error
+               | AppNotFound String   -- ^ Application which should be started was not found
+               | Quit                 -- ^ Triggeres quit (currently not used)
+
 
 instance Error MoonError where
     noMsg  = ErrorMessage "Unknown Error"
@@ -77,49 +82,55 @@ instance Logger Moonbase where
         date <- io $ formatTime defaultTimeLocale rfc822DateFormat <$> getCurrentTime
         io $ hPutStrLn hdl ("[" ++ date ++ "] " ++ show tag ++ ": " ++ msg) >> hFlush hdl
 
-class WindowManagerClass a where
-    startWM :: a -> Moonbase a
-    stopWM ::  a -> Moonbase ()
-
-instance WindowManagerClass WindowManager where
-    startWM (WindowManager w) = WindowManager <$> startWM w
-    stopWM (WindowManager w)  = stopWM w
-
-data WindowManager = forall a. (WindowManagerClass a) => WindowManager a
-
-
-
 class StartStop a where
-    startService :: a -> Moonbase a
-    stopService :: a -> Moonbase ()
+    start :: a -> Moonbase a
+    stop :: a -> Moonbase ()
 
-    restartService :: a -> Moonbase a
-    restartService = stopService >> startService
+    restart :: a -> Moonbase a
+    restart = stop >> start
 
     isRunning :: a -> Moonbase Bool
     isRunning _ = return True
 
-instance StartStop Service where
-    startService (Service n a) = Service n <$> startService a
-    stopService  (Service _ a) = stopService a
 
-    restartService (Service n a) = Service n <$> restartService a
+
+instance StartStop Service where
+    start (Service n a) = Service n <$> start a
+    stop  (Service _ a) = stop a
+
+    isRunning (Service _ a) = isRunning a
+
+
+instance StartStop Desktop where
+    start (Desktop n a) = Desktop n <$> start a
+    stop  (Desktop _ a) = stop a
+
+    isRunning (Desktop _ a) = isRunning a
+
+instance StartStop WindowManager where
+    start (WindowManager n a) = WindowManager n <$> start a
+    stop  (WindowManager _ a) = stop a
+
+    isRunning (WindowManager _ a) = isRunning a
 
 
 class Enable a where
-    enableService :: a -> Moonbase ()
+    enable :: a -> Moonbase ()
 
 instance Enable Service where
-    enableService (OneShot _ a) = enableService a
+    enable (OneShot _ a) = enable a
     
 data Service = forall a. (StartStop a) => Service String a
              | forall a. (Enable a) =>    OneShot String a
 
 
+data Desktop = forall a. (StartStop a) => Desktop String a
+
+data WindowManager = forall a. (StartStop a) => WindowManager String a
+
+
 data Preferred = Entry DesktopEntry
               | AppName String
-
-
  
 runMoon :: MoonConfig -> MoonState -> Moonbase a -> IO (Either MoonError (a, MoonState))
 runMoon
