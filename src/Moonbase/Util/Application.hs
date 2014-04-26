@@ -11,6 +11,7 @@ import System.Process (spawnProcess, ProcessHandle)
 import System.Directory (findExecutable)
 
 import Moonbase.Core
+import Moonbase.Log
 
 
 
@@ -29,6 +30,7 @@ findApp
 spawn:: Application -> [Argument] -> Moonbase ProcessHandle
 spawn
     app args = do
+        debugM $ " --: spawning " ++ app
         exec <- findApp app
         io $ spawnProcess exec args
 

@@ -1,6 +1,5 @@
 module Moonbase.Desktop where
 
-import Control.Monad.Reader
 import Control.Monad.State
 
 import Data.Maybe
@@ -13,7 +12,7 @@ startDesktop
     = do
         infoM "Starting desktop..."
         st <- get
-        d <- start . desktop =<< ask
+        d <- start . desktop =<< askConf
         put $ st { desk = Just d }
 
 stopDesktop :: Moonbase ()

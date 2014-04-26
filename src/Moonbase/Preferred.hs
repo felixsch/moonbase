@@ -26,7 +26,7 @@ setPreferred
     where
         fromPreferred (AppName n) = n ++ ".desktop"
         fromPreferred (Entry e) = getName e ++ ".desktop"
-        update a = M.foldlWithKey updateMime a <$> (preferred <$> ask)
+        update a = M.foldlWithKey updateMime a <$> (preferred <$> askConf)
         updateMime a m n = addDefault m (fromPreferred n) a
         set a = do
             dir <- io userMimeApps

@@ -19,6 +19,7 @@ instance Show LogTag where
 
 class (Monad m) => Logger m where
     logM :: LogTag -> String -> m ()
+    debugM :: String -> m ()
 
     errorM :: String -> m ()
     errorM = logM ErrorTag

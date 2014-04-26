@@ -1,7 +1,6 @@
 module Moonbase.WindowManager where
 
 
-import Control.Monad.Reader
 import Control.Monad.State
 
 import Data.Maybe
@@ -15,7 +14,7 @@ startWindowManager
     = do
         infoM "Starting windowmanager..."
         st <- get
-        w <- start . windowManager =<< ask
+        w <- start . windowManager =<< askConf
         put $ st { wm = Just w }
 
 stopWindowManager :: Moonbase ()

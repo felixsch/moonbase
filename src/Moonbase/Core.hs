@@ -1,8 +1,10 @@
 {-# LANGUAGE ExistentialQuantification, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses #-}
 
 module Moonbase.Core
     ( MoonState(..)
     , MoonConfig(..)
+    , MoonRuntime
     , MoonError(..)
     , Moonbase(..)
     , runMoon, io
@@ -11,6 +13,8 @@ module Moonbase.Core
     , Service(..)
     , Preferred(..)
     , Desktop(..)
+    , askRef
+    , askConf
     ) where
 
 import System.IO
@@ -22,8 +26,10 @@ import Data.Time.Clock (getCurrentTime)
 import Data.Time.Format (formatTime)
 import qualified Data.Map as M
 
+import Control.Monad (when)
 import Control.Applicative
 
+import Data.IORef
 import Control.Monad.Reader
 import Control.Monad.State
 import Control.Monad.Error
@@ -41,6 +47,7 @@ data MoonState = MoonState
   , wm     :: Maybe WindowManager       -- ^ Windowmanager implementation is saved here
   , desk   :: Maybe Desktop
   , logHdl :: Handle                    -- ^ FileHandle to logfile
+  , logVerbose :: Bool                  -- ^ Log to stdout and file
   , services :: M.Map String Service    -- ^ All started services
   }
 
@@ -63,13 +70,30 @@ instance Error MoonError where
     noMsg  = ErrorMessage "Unknown Error"
     strMsg = ErrorMessage
 
+type MoonRuntime = IORef MoonState
 
-newtype Moonbase a = Moonbase (ReaderT MoonConfig (StateT MoonState ( ErrorT MoonError IO)) a)
-    deriving (Functor, Monad, MonadIO, MonadState MoonState, MonadReader MoonConfig, MonadError MoonError)
+newtype Moonbase a = Moonbase (ReaderT (MoonConfig, MoonRuntime) (ErrorT MoonError IO) a)
+    deriving (Functor, Monad, MonadIO, MonadReader (MoonConfig, MoonRuntime), MonadError MoonError)
 
 instance Applicative Moonbase where
     pure    = return
     (<*>)   = ap
+
+
+instance MonadState MoonState Moonbase where
+    get = io . readIORef =<< askRef
+    put v = do
+             r <- askRef
+             io $ writeIORef r v
+
+
+askConf :: Moonbase MoonConfig
+askConf
+    = fst <$> ask
+
+askRef :: Moonbase MoonRuntime
+askRef
+    = snd <$> ask
 
 instance (Monoid a) => Monoid (Moonbase a) where
     mempty = return mempty
@@ -79,8 +103,18 @@ instance (Monoid a) => Monoid (Moonbase a) where
 instance Logger Moonbase where
     logM tag msg = do
         hdl <- logHdl <$> get
+        verbose <- logVerbose <$> get
         date <- io $ formatTime defaultTimeLocale rfc822DateFormat <$> getCurrentTime
         io $ hPutStrLn hdl ("[" ++ date ++ "] " ++ show tag ++ ": " ++ msg) >> hFlush hdl
+        when verbose (io $ putStrLn ("[" ++ date ++ "] " ++ show tag ++ ": " ++ msg))
+
+    debugM msg = do
+        date <- io $ formatTime defaultTimeLocale rfc822DateFormat <$> getCurrentTime
+        hdl <- logHdl <$> get
+        verbose <- logVerbose <$> get
+        when verbose (io $ hPutStrLn hdl ("[" ++ date ++ "]        : " ++ msg) >> hFlush hdl)
+        when verbose (io $ putStrLn ("[" ++ date ++ "]        : " ++ msg))
+        
 
 class StartStop a where
     start :: a -> Moonbase a
@@ -132,9 +166,9 @@ data WindowManager = forall a. (StartStop a) => WindowManager String a
 data Preferred = Entry DesktopEntry
               | AppName String
  
-runMoon :: MoonConfig -> MoonState -> Moonbase a -> IO (Either MoonError (a, MoonState))
+runMoon :: MoonConfig -> MoonRuntime -> Moonbase a -> IO (Either MoonError a)
 runMoon
-    conf st (Moonbase a) = runErrorT $ runStateT (runReaderT a conf) st
+    conf st (Moonbase a) = runErrorT $ runReaderT a (conf, st)
 
 
 io :: (MonadIO m) => IO a -> m a
