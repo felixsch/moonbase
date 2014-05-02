@@ -53,6 +53,7 @@ library
   exposed-modules:    Moonbase
                     , Moonbase.Core
                     , Moonbase.Log
+                    , Moonbase.Hook
                     , Moonbase.Service
                     , Moonbase.Service.Generic
                     , Moonbase.WindowManager

@@ -24,7 +24,7 @@ samplePreferred
 
 setRoot :: String -> Desktop
 setRoot 
-    color = newGenericDesktop "xsetroot" ["-bg", color]
+    color = newGenericDesktop "xsetroot" ["-solid", color]
 
 
 

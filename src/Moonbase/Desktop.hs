@@ -1,4 +1,11 @@
-module Moonbase.Desktop where
+module Moonbase.Desktop 
+    ( startDesktop
+    , stopDesktop
+    , justBackgroundColor
+    , GenericDesktop(..)
+    , newGenericDesktop
+    ) where
+
 
 import Control.Monad.State
 
@@ -6,6 +13,7 @@ import Data.Maybe
 
 import Moonbase.Core
 import Moonbase.Log
+import Moonbase.Desktop.Generic
 
 startDesktop :: Moonbase ()
 startDesktop
@@ -18,4 +26,5 @@ startDesktop
 stopDesktop :: Moonbase ()
 stopDesktop
     = infoM "Stoping desktop..." >> (stop . fromJust . desk =<< get)
+
 

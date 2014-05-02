@@ -20,6 +20,7 @@ import Moonbase.Util.Trigger
 
 import Moonbase.Core
 import Moonbase.Log
+import Moonbase.Hook
 import Moonbase.Service
 import Moonbase.Preferred
 import Moonbase.WindowManager
@@ -84,11 +85,13 @@ newMoonState
             , logHdl = hdl
             , logVerbose = True
             , services = M.empty
+            , pnls = M.empty
+            , hks  = []
             }
 
 startMoonbase :: Moonbase ()
 startMoonbase
-    = infoM "Starting moonbase..." >> registerDBus >> setPreferred >> startDesktop >> startWindowManager >> startServices
+    = infoM "Starting moonbase..." >> runHooks >> registerDBus >> setPreferred >> startDesktop >> startWindowManager >> startServices
 
 stopMoonbase :: Moonbase ()
 stopMoonbase
@@ -99,7 +102,6 @@ moonbase
     conf = do
             client <- startDbus
             l <- openLog
-            
             st <- newIORef =<< newMoonState client l
             re <- runMoon conf st exec
             case re of

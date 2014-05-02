@@ -1,6 +1,7 @@
 module Moonbase.Desktop.Generic
     ( GenericDesktop(..)
     , newGenericDesktop
+    , justBackgroundColor
     ) where
 
 
@@ -34,3 +35,8 @@ stopGenericDesktop
 newGenericDesktop :: String -> [String] -> Desktop
 newGenericDesktop 
     cmd args = Desktop cmd $ GenericDesktop cmd args Nothing
+
+
+
+justBackgroundColor :: String -> Desktop
+justBackgroundColor color = newGenericDesktop "xsetroot" ["-solid", color]

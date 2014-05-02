@@ -12,6 +12,8 @@ module Moonbase.Core
     , StartStop(..), Enable(..)
     , Service(..)
     , Preferred(..)
+    , Panel(..)
+    , Hook(..)
     , Desktop(..)
     , askRef
     , askConf
@@ -45,10 +47,12 @@ data MoonState = MoonState
   { quit   :: Trigger                   -- ^ MVar to triggere the quit event
   , dbus   :: Client                    -- ^ The core moonbase dbus session
   , wm     :: Maybe WindowManager       -- ^ Windowmanager implementation is saved here
-  , desk   :: Maybe Desktop
+  , desk   :: Maybe Desktop             -- ^ Desktop instance
   , logHdl :: Handle                    -- ^ FileHandle to logfile
   , logVerbose :: Bool                  -- ^ Log to stdout and file
   , services :: M.Map String Service    -- ^ All started services
+  , pnls    :: M.Map String Panel       -- ^ All running panels
+  , hks     :: [Hook]                   -- ^ Enabled hooks
   }
 
 -- | Moonbase user configuration
@@ -58,6 +62,8 @@ data MoonConfig = MoonConfig
     , autostart     :: [Service]                -- ^ Many services which should be started
     , preferred      :: M.Map String Preferred  -- ^ A map of preffered applications for each mimetype
     , desktop :: Desktop
+    , panels :: [Panel]
+    , hooks :: [Hook]
     }
 
 -- | Error types for the ErrorT instance
@@ -147,6 +153,17 @@ instance StartStop WindowManager where
 
     isRunning (WindowManager _ a) = isRunning a
 
+instance StartStop Panel where
+    start (Panel n a) = Panel n <$> start a
+    stop  (Panel _ a) = stop a
+
+    isRunning (Panel _ a) = isRunning a
+
+instance StartStop Hook where
+    start (Hook a) = Hook <$> start a
+    stop  (Hook a) = stop a
+
+    isRunning (Hook a) = isRunning a
 
 class Enable a where
     enable :: a -> Moonbase ()
@@ -158,9 +175,20 @@ data Service = forall a. (StartStop a) => Service String a
              | forall a. (Enable a) =>    OneShot String a
 
 
+
 data Desktop = forall a. (StartStop a) => Desktop String a
 
 data WindowManager = forall a. (StartStop a) => WindowManager String a
+
+
+data HookPosition = HookStart
+                  | HookQuit
+                  | HookAfterStartup
+data Hook = forall a. (StartStop a) => Hook HookPosition a
+
+
+
+data Panel = forall a. (StartStop a) => Panel String a
 
 
 data Preferred = Entry DesktopEntry
