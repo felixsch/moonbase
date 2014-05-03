@@ -17,6 +17,8 @@ instance StartStop GenericWM where
     stop (GenericWM _ _ (Just hdl)) = io $ terminateProcess hdl
     stop (GenericWM n _ _ )         = warnM $ "wm: " ++ n ++ " is not running but should be stopped"
 
+instance Requires GenericWM
+
 newGenericWM :: String -> [String] -> WindowManager
 newGenericWM
     cmd args = WindowManager cmd $ GenericWM cmd args Nothing

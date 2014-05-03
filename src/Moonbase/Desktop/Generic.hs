@@ -5,11 +5,8 @@ module Moonbase.Desktop.Generic
     ) where
 
 
-import Control.Monad (void)
 import Control.Applicative
 import System.Process
-
-import Data.Maybe (isNothing)
 
 import Moonbase.Core
 import Moonbase.Log
@@ -20,6 +17,8 @@ data GenericDesktop = GenericDesktop String [String] (Maybe ProcessHandle)
 instance StartStop GenericDesktop where
     start = startGenericDesktop
     stop  = stopGenericDesktop
+
+instance Requires GenericDesktop
 
 startGenericDesktop :: GenericDesktop -> Moonbase GenericDesktop
 startGenericDesktop

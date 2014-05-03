@@ -54,6 +54,7 @@ registerDBus
             , autoMethod core "ListAllServices" (wrap cf ref dbusListAllServices)
             , autoMethod core "StopService" (wrap1 cf ref dbusStopService)
             , autoMethod core "StartService" (wrap1 cf ref dbusStartService)
+            , autoMethod core "ListAllHooks" (wrap cf ref dbusListAllHooks)
             ]
     where
         core = "org.Moonbase.Core"
@@ -91,11 +92,24 @@ newMoonState
 
 startMoonbase :: Moonbase ()
 startMoonbase
-    = infoM "Starting moonbase..." >> runHooks >> registerDBus >> setPreferred >> startDesktop >> startWindowManager >> startServices
+    = infoM "Starting moonbase..." 
+    >> loadHooks
+    >> runHooks HookStart
+    >> registerDBus
+    >> setPreferred
+    >> startDesktop
+    >> startWindowManager
+    >> startServices
+    >> runHooks HookAfterStartup
 
 stopMoonbase :: Moonbase ()
 stopMoonbase
-    = stopServices >> stopWindowManager >> stopDesktop >> infoM "Stoping moonbase..."
+    = runHooks HookBeforeQuit
+    >> stopServices 
+    >> stopWindowManager 
+    >> stopDesktop 
+    >> runHooks HookQuit
+    >> infoM "Stoping moonbase..."
 
 moonbase :: MoonConfig -> IO ()
 moonbase

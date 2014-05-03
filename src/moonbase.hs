@@ -35,7 +35,8 @@ defaultConfig
     , autostart = [xfcePanel]
     , preferred = samplePreferred
     , desktop   = setRoot "#ff0000"
-    
+    , panels = []
+    , hooks = []
     }
 
 main :: IO ()

@@ -9,10 +9,11 @@ module Moonbase.Core
     , Moonbase(..)
     , runMoon, io
     , WindowManager(..)
-    , StartStop(..), Enable(..)
+    , StartStop(..), Enable(..), Requires(..)
     , Service(..)
     , Preferred(..)
     , Panel(..)
+    , HookType(..)
     , Hook(..)
     , Desktop(..)
     , askRef
@@ -28,7 +29,6 @@ import Data.Time.Clock (getCurrentTime)
 import Data.Time.Format (formatTime)
 import qualified Data.Map as M
 
-import Control.Monad (when)
 import Control.Applicative
 
 import Data.IORef
@@ -42,6 +42,9 @@ import DBus.Client
 import Moonbase.Log
 import Moonbase.Util.Trigger
 
+
+type Name = String
+
 -- | Moonbase basic read write state
 data MoonState = MoonState
   { quit   :: Trigger                   -- ^ MVar to triggere the quit event
@@ -50,8 +53,8 @@ data MoonState = MoonState
   , desk   :: Maybe Desktop             -- ^ Desktop instance
   , logHdl :: Handle                    -- ^ FileHandle to logfile
   , logVerbose :: Bool                  -- ^ Log to stdout and file
-  , services :: M.Map String Service    -- ^ All started services
-  , pnls    :: M.Map String Panel       -- ^ All running panels
+  , services :: M.Map Name Service    -- ^ All started services
+  , pnls    :: M.Map Name Panel       -- ^ All running panels
   , hks     :: [Hook]                   -- ^ Enabled hooks
   }
 
@@ -120,7 +123,7 @@ instance Logger Moonbase where
         verbose <- logVerbose <$> get
         when verbose (io $ hPutStrLn hdl ("[" ++ date ++ "]        : " ++ msg) >> hFlush hdl)
         when verbose (io $ putStrLn ("[" ++ date ++ "]        : " ++ msg))
-        
+
 
 class StartStop a where
     start :: a -> Moonbase a
@@ -159,36 +162,53 @@ instance StartStop Panel where
 
     isRunning (Panel _ a) = isRunning a
 
-instance StartStop Hook where
-    start (Hook a) = Hook <$> start a
-    stop  (Hook a) = stop a
-
-    isRunning (Hook a) = isRunning a
 
 class Enable a where
     enable :: a -> Moonbase ()
 
 instance Enable Service where
     enable (OneShot _ a) = enable a
-    
-data Service = forall a. (StartStop a) => Service String a
-             | forall a. (Enable a) =>    OneShot String a
 
+instance Enable Hook where
+    enable (Hook _ _ a) = enable a
 
-
-data Desktop = forall a. (StartStop a) => Desktop String a
-
-data WindowManager = forall a. (StartStop a) => WindowManager String a
-
-
-data HookPosition = HookStart
-                  | HookQuit
+data HookType = HookStart
                   | HookAfterStartup
-data Hook = forall a. (StartStop a) => Hook HookPosition a
+                  | HookBeforeQuit
+                  | HookQuit
+                  deriving(Show, Eq)
 
+data Hook = forall a. (Enable a) => Hook Name HookType a
 
+instance Eq Hook where
+    (Hook aName aType _) == (Hook bName bType _)  = aName == bName && aType == bType
 
-data Panel = forall a. (StartStop a) => Panel String a
+class Requires a where
+    requires :: a -> [Hook]
+    requires _ = []
+
+instance Requires Service where
+    requires (Service _ a) = requires a
+    requires (OneShot _ a) = requires a
+
+instance Requires Desktop where
+    requires (Desktop _ a) = requires a
+
+instance Requires WindowManager where
+    requires (WindowManager _ a) = requires a
+
+instance Requires Panel where
+    requires (Panel _ a) = requires a
+    
+    
+data Service = forall a. (Requires a, StartStop a) => Service Name a
+             | forall a. (Requires a, Enable a) =>    OneShot Name a
+
+data Desktop = forall a. (Requires a, StartStop a) => Desktop Name a
+
+data WindowManager = forall a. (Requires a, StartStop a) => WindowManager Name a
+
+data Panel = forall a. (Requires a, StartStop a) => Panel Name a
 
 
 data Preferred = Entry DesktopEntry

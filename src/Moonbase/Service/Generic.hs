@@ -22,6 +22,7 @@ instance StartStop GenericService where
     stop   = stopGenericService
     isRunning     = isGenericServiceRunning
 
+instance Requires GenericService
 
 
 startGenericService :: GenericService -> Moonbase GenericService
@@ -47,6 +48,8 @@ data GenericOneShot = GenericOneShot String [String]
 
 instance Enable GenericOneShot where
     enable (GenericOneShot cmd args) = void $ spawn cmd args
+
+instance Requires GenericOneShot
 
 newGenericService :: String -> [String] -> Service
 newGenericService 

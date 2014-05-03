@@ -1,22 +1,40 @@
 module Moonbase.Hook
-    ( runHooks
+    ( loadHooks
+    , runHooks
+    , dbusListAllHooks
     ) where
 
 import Control.Applicative
 import Control.Monad.State
 
+import Data.List
+
 import Moonbase.Core
+import Moonbase.Log
 
 
-
-runHooks :: Moonbase ()
-runHooks
-    = mapM_ start' =<< hooks <$> askConf
+loadHooks :: Moonbase ()
+loadHooks
+    = do
+        h <- allHooks
+        modify (\conf -> conf { hks = h })
     where
-        start' (Hook x) = do
-            st <- get
-            nh <- start x
-            put $ st { hks = Hook nh : hks st}
+        allHooks = nub . concat <$> sequence [one desktop, more autostart, more panels, one windowManager, hooks <$> askConf]
+        one t = requires . t <$> askConf
+        more t = concatMap requires . t <$> askConf
 
-    
 
+runHooks :: HookType -> Moonbase ()
+runHooks
+    t = mapM_ enable' =<< (filter (byType t) . hks <$> get)
+    where
+        byType a (Hook _ b _ ) = a == b
+        enable' (Hook a ty c) = do
+            infoM $ "[" ++ show ty ++ "] hook '" ++ a ++ "' started"
+            enable c
+
+
+dbusListAllHooks :: Moonbase [(String,String)]
+dbusListAllHooks
+    = map (\(Hook n t _) -> (show t, n)) . hks <$> get
+            
