@@ -54,6 +54,7 @@ library
                     , Moonbase.Core
                     , Moonbase.Log
                     , Moonbase.Hook
+                    , Moonbase.Panel
                     , Moonbase.Service
                     , Moonbase.Service.Generic
                     , Moonbase.WindowManager

@@ -21,6 +21,7 @@ import Moonbase.Util.Trigger
 import Moonbase.Core
 import Moonbase.Log
 import Moonbase.Hook
+import Moonbase.Panel
 import Moonbase.Service
 import Moonbase.Preferred
 import Moonbase.WindowManager
@@ -55,6 +56,10 @@ registerDBus
             , autoMethod core "StopService" (wrap1 cf ref dbusStopService)
             , autoMethod core "StartService" (wrap1 cf ref dbusStartService)
             , autoMethod core "ListAllHooks" (wrap cf ref dbusListAllHooks)
+            , autoMethod core "ListRunningPanels" (wrap cf ref dbusListRunningPanels)
+            , autoMethod core "ListAllPanels" (wrap cf ref dbusListAllPanels)
+            , autoMethod core "StartPanel" (wrap1 cf ref dbusStartPanel)
+            , autoMethod core "StopPanel" (wrap1 cf ref dbusStopPanel)
             ]
     where
         core = "org.Moonbase.Core"

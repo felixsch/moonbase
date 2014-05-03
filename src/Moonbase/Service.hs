@@ -1,7 +1,8 @@
 module Moonbase.Service
     ( startServices
     , stopServices
-    , getService
+    , getService, putService
+    , askService
     , isServiceRunning
     , dbusListAllServices
     , dbusListRunningServices
@@ -45,7 +46,15 @@ stopServices
 
 
 getService :: String -> Moonbase (Maybe Service)
-getService 
+getService
+    n = M.lookup n . services <$> get
+
+putService :: Service -> Moonbase ()
+putService
+    s@(Service n _) = modify (\st -> st { services = M.insert n s (services st)})
+
+askService :: String -> Moonbase (Maybe Service)
+askService 
     sn = search . autostart <$> askConf
     where
         search (x@(Service n _):xs)
@@ -81,10 +90,10 @@ dbusStartService :: String -> Moonbase ()
 dbusStartService
     sn = do
         notRunning <- not <$> isServiceRunning sn
-        when notRunning (start' =<< getService sn)
+        when notRunning (start' =<< askService sn)
     where
         start' Nothing  = warnM $ "Could not start service: " ++ sn ++ " is unknown"
         start' (Just s) = do
-            st <- get
+            debugM $ "dbus --> starting service " ++ sn
             ns <- start s
-            put $ st { services = M.insert sn (Service sn ns) (services st) }
+            putService $ Service sn ns

@@ -7,6 +7,7 @@ module Moonbase.Core
     , MoonRuntime
     , MoonError(..)
     , Moonbase(..)
+    , Name
     , runMoon, io
     , WindowManager(..)
     , StartStop(..), Enable(..), Requires(..)
@@ -199,8 +200,7 @@ instance Requires WindowManager where
 
 instance Requires Panel where
     requires (Panel _ a) = requires a
-    
-    
+     
 data Service = forall a. (Requires a, StartStop a) => Service Name a
              | forall a. (Requires a, Enable a) =>    OneShot Name a
 
