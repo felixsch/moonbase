@@ -105,11 +105,13 @@ startMoonbase
     >> startDesktop
     >> startWindowManager
     >> startServices
+    >> startPanels
     >> runHooks HookAfterStartup
 
 stopMoonbase :: Moonbase ()
 stopMoonbase
     = runHooks HookBeforeQuit
+    >> stopPanels
     >> stopServices 
     >> stopWindowManager 
     >> stopDesktop 

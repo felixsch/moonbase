@@ -170,16 +170,13 @@ class Enable a where
 instance Enable Service where
     enable (OneShot _ a) = enable a
 
-instance Enable Hook where
-    enable (Hook _ _ a) = enable a
-
 data HookType = HookStart
                   | HookAfterStartup
                   | HookBeforeQuit
                   | HookQuit
                   deriving(Show, Eq)
 
-data Hook = forall a. (Enable a) => Hook Name HookType a
+data Hook = Hook Name HookType (Moonbase ())
 
 instance Eq Hook where
     (Hook aName aType _) == (Hook bName bType _)  = aName == bName && aType == bType

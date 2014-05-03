@@ -45,7 +45,7 @@ stopServices
         stop' (n, OneShot _ _) = throwError $ ErrorMessage $ "Trying to stop a oneshot service... wired! (" ++ n ++ " shoudl never be added here"
 
 
-getService :: String -> Moonbase (Maybe Service)
+getService :: Name -> Moonbase (Maybe Service)
 getService
     n = M.lookup n . services <$> get
 
@@ -53,7 +53,7 @@ putService :: Service -> Moonbase ()
 putService
     s@(Service n _) = modify (\st -> st { services = M.insert n s (services st)})
 
-askService :: String -> Moonbase (Maybe Service)
+askService :: Name -> Moonbase (Maybe Service)
 askService 
     sn = search . autostart <$> askConf
     where
@@ -62,7 +62,7 @@ askService
             | otherwise = search xs
         search [] = Nothing
 
-isServiceRunning :: String -> Moonbase Bool
+isServiceRunning :: Name -> Moonbase Bool
 isServiceRunning
     sn = M.member sn . services <$> get
 
@@ -76,7 +76,7 @@ dbusListRunningServices
     = M.keys . services <$> get
 
 
-dbusStopService :: String -> Moonbase ()
+dbusStopService :: Name -> Moonbase ()
 dbusStopService
     sn = perform =<< M.lookup sn <$> (services <$> get)
     where
@@ -86,7 +86,7 @@ dbusStopService
             stop s
             put $ st { services = M.delete sn (services st) }
 
-dbusStartService :: String -> Moonbase ()
+dbusStartService :: Name -> Moonbase ()
 dbusStartService
     sn = do
         notRunning <- not <$> isServiceRunning sn

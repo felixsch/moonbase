@@ -29,9 +29,9 @@ runHooks
     t = mapM_ enable' =<< (filter (byType t) . hks <$> get)
     where
         byType a (Hook _ b _ ) = a == b
-        enable' (Hook a ty c) = do
+        enable' (Hook a ty call) = do
             infoM $ "[" ++ show ty ++ "] hook '" ++ a ++ "' started"
-            enable c
+            call
 
 
 dbusListAllHooks :: Moonbase [(String,String)]
