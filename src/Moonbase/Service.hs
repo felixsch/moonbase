@@ -14,7 +14,6 @@ module Moonbase.Service
 import Control.Applicative
 import Control.Monad.Reader
 import Control.Monad.State
-import Control.Monad.Error
 
 import qualified Data.Map as M
 
@@ -30,7 +29,6 @@ startServices
             st <- get
             s <- start a
             put $ st { services = M.insert n (Service n s) (services st) }
-        start' (OneShot n a) = infoM ("Enable oneshot service: "++n) >> enable a
 
 
 stopServices :: Moonbase ()
@@ -42,7 +40,6 @@ stopServices
             stop a
             st <- get
             put $ st { services = M.delete n (services st) }
-        stop' (n, OneShot _ _) = throwError $ ErrorMessage $ "Trying to stop a oneshot service... wired! (" ++ n ++ " shoudl never be added here"
 
 
 getService :: Name -> Moonbase (Maybe Service)

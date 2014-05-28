@@ -1,0 +1,3 @@
+language: haskell
+notifications:
+    irc: "chat.freenode.net#felixsch"

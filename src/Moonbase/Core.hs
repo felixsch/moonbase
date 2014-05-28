@@ -1,5 +1,6 @@
 {-# LANGUAGE ExistentialQuantification, GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleInstances, MultiParamTypeClasses #-}
+{-# LANGUAGE InstanceSigs #-}
 
 module Moonbase.Core
     ( MoonState(..)
@@ -10,7 +11,7 @@ module Moonbase.Core
     , Name
     , runMoon, io
     , WindowManager(..)
-    , StartStop(..), Enable(..), Requires(..)
+    , StartStop(..), Requires(..)
     , Service(..)
     , Preferred(..)
     , Panel(..)
@@ -163,13 +164,6 @@ instance StartStop Panel where
 
     isRunning (Panel _ a) = isRunning a
 
-
-class Enable a where
-    enable :: a -> Moonbase ()
-
-instance Enable Service where
-    enable (OneShot _ a) = enable a
-
 data HookType = HookStart
                   | HookAfterStartup
                   | HookBeforeQuit
@@ -187,7 +181,6 @@ class Requires a where
 
 instance Requires Service where
     requires (Service _ a) = requires a
-    requires (OneShot _ a) = requires a
 
 instance Requires Desktop where
     requires (Desktop _ a) = requires a
@@ -197,9 +190,9 @@ instance Requires WindowManager where
 
 instance Requires Panel where
     requires (Panel _ a) = requires a
-     
+
+
 data Service = forall a. (Requires a, StartStop a) => Service Name a
-             | forall a. (Requires a, Enable a) =>    OneShot Name a
 
 data Desktop = forall a. (Requires a, StartStop a) => Desktop Name a
 
@@ -214,7 +207,6 @@ data Preferred = Entry DesktopEntry
 runMoon :: MoonConfig -> MoonRuntime -> Moonbase a -> IO (Either MoonError a)
 runMoon
     conf st (Moonbase a) = runErrorT $ runReaderT a (conf, st)
-
 
 io :: (MonadIO m) => IO a -> m a
 io

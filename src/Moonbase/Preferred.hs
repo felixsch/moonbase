@@ -6,7 +6,6 @@ module Moonbase.Preferred
 import Control.Applicative
 
 import System.Directory
-import Control.Monad.Reader
 
 import qualified Data.Map as M
 import System.Environment.XDG.BaseDir (getUserDataDir)

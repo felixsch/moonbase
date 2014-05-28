@@ -38,7 +38,7 @@ startDbus :: IO Client
 startDbus 
     = do
         client <- connectSession
-        name   <- requestName client "org.Moonbase" []
+        name   <- requestName client "org.Moonbase.Core" []
         case name of
             NamePrimaryOwner -> return client
             _                -> error "Connection to Session Bus failed. Name allready in use"
@@ -49,7 +49,7 @@ registerDBus
         ref <- askRef
         st <- get
         cf <- askConf        
-        io $ export (dbus st) "/org/moonbase"
+        io $ export (dbus st) "/"
             [ autoMethod core "Quit" (trigger $ quit st)
             , autoMethod core "ListRunningServices" (wrap cf ref dbusListRunningServices)
             , autoMethod core "ListAllServices" (wrap cf ref dbusListAllServices)
@@ -69,7 +69,9 @@ registerDBus
 justReturn :: Either MoonError a -> a
 justReturn (Left (ErrorMessage err)) = error $ "Error: " ++ err
 justReturn (Left (AppNotFound appl)) = error $ "App not found: " ++ appl
+justReturn (Left Quit)             = error "Application quitted.."
 justReturn (Right x) = x
+
  
             
 openLog :: IO Handle

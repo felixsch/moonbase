@@ -1,12 +1,13 @@
 module Moonbase.Service.Generic
     ( GenericService(..)
     , newGenericService
-    , newGenericOneShot
     ) where
 
-import Control.Monad (void)
 import Control.Applicative
+import Control.Monad.Error (throwError)
+
 import System.Process
+
 
 import Data.Maybe (isNothing)
 
@@ -28,6 +29,8 @@ instance Requires GenericService
 startGenericService :: GenericService -> Moonbase GenericService
 startGenericService
     (GenericService cmd args Nothing) = GenericService cmd args . Just <$> spawn cmd args
+startGenericService
+    (GenericService cmd _    _      ) = throwError $ ErrorMessage $ "Trying to call a allready started serice: " ++ cmd 
 
 stopGenericService :: GenericService -> Moonbase ()
 stopGenericService
@@ -43,19 +46,6 @@ isGenericServiceRunning
     _                              = return False
 
 
-
-data GenericOneShot = GenericOneShot String [String]
-
-instance Enable GenericOneShot where
-    enable (GenericOneShot cmd args) = void $ spawn cmd args
-
-instance Requires GenericOneShot
-
 newGenericService :: String -> [String] -> Service
 newGenericService 
     cmd args = Service cmd $ GenericService cmd args Nothing
-
-
-newGenericOneShot :: String -> [String] -> Service
-newGenericOneShot
-    cmd args = OneShot cmd $ GenericOneShot cmd args
