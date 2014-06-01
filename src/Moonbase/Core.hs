@@ -1,6 +1,8 @@
 {-# LANGUAGE ExistentialQuantification, GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, FlexibleContexts #-}
 {-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE ImpredicativeTypes #-}
 
 module Moonbase.Core
     ( MoonState(..)
@@ -137,6 +139,74 @@ class StartStop a where
     isRunning :: a -> Moonbase Bool
     isRunning _ = return True
 
+class (Monad m) => NStartStop m st where
+    nstart :: st -> m st
+    nstop  :: st -> m ()
+
+    nisRunning :: st -> m Bool
+
+    nrestart :: st -> m st
+    nrestart st = nstop st >> nstart st
+
+data ServiceError = UnknownError String
+
+instance Error ServiceError where
+    noMsg  = UnknownError "Unknown Error"
+    strMsg = UnknownError
+
+data NService st = (NStartStop (ServiceT st) st) => NService Name st
+
+instance NStartStop (ServiceT st) (NService st) where
+    nstart (NService n st) = return . NService n =<< nstart st
+    nstop  (NService _ st) = nstop st
+
+    nisRunning (NService _ st) = nisRunning st
+
+newtype ServiceT st a = ServiceT (StateT st (ErrorT ServiceError Moonbase) a)
+    deriving (Functor, Monad, MonadIO, MonadError ServiceError, MonadState st)
+
+
+instance Applicative (ServiceT st) where
+    pure = return
+    (<*>) = ap
+
+
+-- Test
+
+
+data Sample = Sample String
+
+instance NStartStop (ServiceT Sample) Sample where
+    nstart (Sample msg) = (io $ putStrLn $ "Starting sample: " ++ msg) >> (return $ Sample "Moep")
+    nstop _ = io $ putStrLn "There is nothing to stop..."
+
+    nisRunning _ = return True
+
+newSample :: String -> NService Sample
+newSample msg = NService "SampleService" $ Sample msg
+
+testme :: ServiceT Sample ()
+testme = do
+    s <- get
+    return ()
+
+data ServiceRef = forall st. ServiceRef [NService st]
+
+makeServices :: forall st. (NStartStop (ServiceT st) st) => [NService st] -> ServiceRef
+makeServices = ServiceRef
+
+
+
+data Foobar = Foobar
+  { dummy :: String
+  , nservices :: ServiceRef
+  }
+
+testFoobar :: Foobar
+testFoobar = Foobar
+  { dummy = "Moep"
+  , nservices = ServiceRef [newSample "Hello Haskell"]
+  }
 
 
 instance StartStop Service where
@@ -169,6 +239,7 @@ data HookType = HookStart
                   | HookBeforeQuit
                   | HookQuit
                   deriving(Show, Eq)
+
 
 data Hook = Hook Name HookType (Moonbase ())
 
