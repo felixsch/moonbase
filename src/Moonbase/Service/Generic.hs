@@ -4,47 +4,39 @@ module Moonbase.Service.Generic
     ) where
 
 import Control.Applicative
-import Control.Monad.Error (throwError)
+import Control.Monad.State
 
 import System.Process
 
 
-import Data.Maybe (isNothing)
+import Data.Maybe (isJust)
 
 import Moonbase.Core
-import Moonbase.Log
 import Moonbase.Util.Application
+
 
 
 data GenericService = GenericService String [String] (Maybe ProcessHandle)
 
-instance StartStop GenericService where
-    start  = startGenericService
-    stop   = stopGenericService
-    isRunning     = isGenericServiceRunning
-
 instance Requires GenericService
 
+instance IsService GenericService where
+    initState = return $ GenericService "" [] Nothing
+    startService = do
+        (GenericService cmd args _) <- get
+        hdl <- spawn cmd args
+        put $ GenericService cmd args hdl
+        return True
+    stopService = do
+        (GenericService _  _ hdl) <- get
+        maybe (return ()) (io . terminateProcess) hdl
 
-startGenericService :: GenericService -> Moonbase GenericService
-startGenericService
-    (GenericService cmd args Nothing) = GenericService cmd args . Just <$> spawn cmd args
-startGenericService
-    (GenericService cmd _    _      ) = throwError $ ErrorMessage $ "Trying to call a allready started serice: " ++ cmd 
-
-stopGenericService :: GenericService -> Moonbase ()
-stopGenericService
-    (GenericService _ _ (Just pr)) = io (terminateProcess pr)
-stopGenericService
-    (GenericService n _ _)         = warnM $ "service: " ++ n ++ " is not running but should be stopped"
-
-
-isGenericServiceRunning :: GenericService -> Moonbase Bool
-isGenericServiceRunning
-    (GenericService _ _ (Just pr)) = isNothing <$> io (getProcessExitCode pr)
-isGenericServiceRunning
-    _                              = return False
-
+    isServiceRunning = do
+        (GenericService _ _ hdl) <- get
+        isJust <$> getExitCode hdl
+        where
+            getExitCode (Just x) = io $ getProcessExitCode x
+            getExitCode Nothing  = return Nothing
 
 newGenericService :: String -> [String] -> Service
 newGenericService 

@@ -70,6 +70,7 @@ justReturn :: Either MoonError a -> a
 justReturn (Left (ErrorMessage err)) = error $ "Error: " ++ err
 justReturn (Left (AppNotFound appl)) = error $ "App not found: " ++ appl
 justReturn (Left Quit)             = error "Application quitted.."
+justReturn (Left (FatalError err)) = error $ "Fatal Error occured: " ++ err
 justReturn (Right x) = x
 
  

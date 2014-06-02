@@ -11,10 +11,9 @@ module Moonbase.Core
     , MoonError(..)
     , Moonbase(..)
     , Name
-    , runMoon, io
+    , runMoon, io, moon
     , WindowManager(..)
     , StartStop(..), Requires(..)
-    , Service(..)
     , Preferred(..)
     , Panel(..)
     , HookType(..)
@@ -22,17 +21,17 @@ module Moonbase.Core
     , Desktop(..)
     , askRef
     , askConf
-    -- NEW
-    , NStartStop(..)
+    --
+    , IsService(..)
+    , ServiceError(..)
+    , Service(..)
+    , runServiceT
     ) where
 
 import System.IO
-import System.Locale (defaultTimeLocale, rfc822DateFormat)
 import System.Environment.XDG.DesktopEntry
 
 import Data.Monoid
-import Data.Time.Clock (getCurrentTime)
-import Data.Time.Format (formatTime)
 import qualified Data.Map as M
 
 import Control.Applicative
@@ -40,10 +39,10 @@ import Control.Applicative
 import Data.IORef
 import Control.Monad.Reader
 import Control.Monad.State
+import Control.Monad.Trans.Except
 import Control.Monad.Error
 
 import DBus.Client
-
 
 import Moonbase.Log
 import Moonbase.Util.Trigger
@@ -78,17 +77,22 @@ data MoonConfig = MoonConfig
 -- | Error types for the ErrorT instance
 data MoonError = ErrorMessage String  -- ^ generic Error
                | AppNotFound String   -- ^ Application which should be started was not found
+               | FatalError String
                | Quit                 -- ^ Triggeres quit (currently not used)
+               deriving (Show)
 
 
-instance Error MoonError where
-    noMsg  = ErrorMessage "Unknown Error"
-    strMsg = ErrorMessage
 
 type MoonRuntime = IORef MoonState
 
-newtype Moonbase a = Moonbase (ReaderT (MoonConfig, MoonRuntime) (ErrorT MoonError IO) a)
+newtype Moonbase a = Moonbase (ReaderT (MoonConfig, MoonRuntime) (ExceptT MoonError IO) a)
     deriving (Functor, Monad, MonadIO, MonadReader (MoonConfig, MoonRuntime), MonadError MoonError)
+
+class (MonadIO m, Logger m, Applicative m) => MonadMB m where
+    moon :: Moonbase a -> m a
+
+instance MonadMB Moonbase where
+    moon = id
 
 instance Applicative Moonbase where
     pure    = return
@@ -119,16 +123,16 @@ instance Logger Moonbase where
     logM tag msg = do
         hdl <- logHdl <$> get
         verbose <- logVerbose <$> get
-        date <- io $ formatTime defaultTimeLocale rfc822DateFormat <$> getCurrentTime
-        io $ hPutStrLn hdl ("[" ++ date ++ "] " ++ show tag ++ ": " ++ msg) >> hFlush hdl
-        when verbose (io $ putStrLn ("[" ++ date ++ "] " ++ show tag ++ ": " ++ msg))
+        message <- formatMessage tag Nothing msg
+        io $ hPutStrLn hdl message >> hFlush hdl
+        when verbose $ io $ putStrLn message
 
     debugM msg = do
-        date <- io $ formatTime defaultTimeLocale rfc822DateFormat <$> getCurrentTime
         hdl <- logHdl <$> get
         verbose <- logVerbose <$> get
-        when verbose (io $ hPutStrLn hdl ("[" ++ date ++ "]        : " ++ msg) >> hFlush hdl)
-        when verbose (io $ putStrLn ("[" ++ date ++ "]        : " ++ msg))
+        message <- formatMessage DebugTag Nothing msg
+        when verbose $ io $ hPutStrLn hdl message >> hFlush hdl
+        when verbose $ io $ putStrLn message
 
 
 class StartStop a where
@@ -141,21 +145,66 @@ class StartStop a where
     isRunning :: a -> Moonbase Bool
     isRunning _ = return True
 
-class (Monad m) => NStartStop m where
-    nstart :: m Bool
-    nstop  :: m ()
+-- Services
 
-    nisRunning :: m Bool
+data ServiceError = ServiceError String
+                  | ServiceWarning  String
+                  | ServiceFatalError String
+                  deriving (Show)
 
-    nrestart :: m Bool
-    nrestart = nstop >> nstart
 
-instance StartStop Service where
-    start (Service n a) = Service n <$> start a
-    stop  (Service _ a) = stop a
 
-    isRunning (Service _ a) = isRunning a
+newtype ServiceT st a = ServiceT (StateT st (ExceptT ServiceError Moonbase) a)
+    deriving (Functor, Monad, MonadIO, MonadState st, MonadError ServiceError)
 
+
+instance MonadMB (ServiceT st) where
+    moon = ServiceT . lift . lift
+
+  
+instance (Monoid a) => Monoid (ServiceT st a) where
+    mempty = return mempty
+    mappend = liftM2 mappend
+
+instance Applicative (ServiceT st) where
+    pure = return
+    (<*>) = ap
+
+instance Logger (ServiceT st) where
+    logM tag msg = do
+        hdl <- logHdl <$> moon get
+        verbose <- logVerbose <$> moon get
+        message <- formatMessage tag (Just "Service") msg
+        io $ hPutStrLn hdl message >> hFlush hdl
+        when verbose $ io $ putStrLn message
+
+    debugM msg = do
+        hdl <- logHdl <$> moon get
+        verbose <- logVerbose <$> moon get
+        message <- formatMessage DebugTag (Just "Service") msg
+        io $ hPutStrLn hdl message >> hFlush hdl
+        when verbose $ io $ putStrLn message
+
+class IsService st where
+
+    initState :: ServiceT st st
+
+    startService :: ServiceT st Bool
+    stopService  :: ServiceT st ()
+    
+    restartService :: ServiceT st Bool 
+    restartService = stopService >> startService
+
+    isServiceRunning :: ServiceT st Bool
+
+
+data Service = forall st. (Requires st, IsService st) => Service Name st
+
+runServiceT :: ServiceT st a -> st -> Moonbase (Either ServiceError (a, st))
+runServiceT (ServiceT cmd) = runExceptT . runStateT cmd
+
+
+-- Service End 
 
 instance StartStop Desktop where
     start (Desktop n a) = Desktop n <$> start a
@@ -204,7 +253,6 @@ instance Requires Panel where
     requires (Panel _ a) = requires a
 
 
-data Service = forall a. (Requires a, StartStop a) => Service Name a
 
 data Desktop = forall a. (Requires a, StartStop a) => Desktop Name a
 
@@ -218,7 +266,7 @@ data Preferred = Entry DesktopEntry
  
 runMoon :: MoonConfig -> MoonRuntime -> Moonbase a -> IO (Either MoonError a)
 runMoon
-    conf st (Moonbase a) = runErrorT $ runReaderT a (conf, st)
+    conf st (Moonbase a) = runExceptT $ runReaderT a (conf, st)
 
 io :: (MonadIO m) => IO a -> m a
 io

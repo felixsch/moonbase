@@ -22,7 +22,7 @@ instance Requires GenericDesktop
 
 startGenericDesktop :: GenericDesktop -> Moonbase GenericDesktop
 startGenericDesktop
-    (GenericDesktop cmd args _) = GenericDesktop cmd args . Just <$> spawn cmd args
+    (GenericDesktop cmd args _) = GenericDesktop cmd args <$> spawn cmd args
 
 stopGenericDesktop :: GenericDesktop -> Moonbase ()
 stopGenericDesktop

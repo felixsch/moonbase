@@ -13,7 +13,7 @@ import Moonbase.Util.Application
 data GenericWM = GenericWM String [String] (Maybe ProcessHandle)
 
 instance StartStop GenericWM where
-    start (GenericWM w args _) = GenericWM w args . Just <$> spawn w args
+    start (GenericWM w args _) = GenericWM w args <$> spawn w args
     stop (GenericWM _ _ (Just hdl)) = io $ terminateProcess hdl
     stop (GenericWM n _ _ )         = warnM $ "wm: " ++ n ++ " is not running but should be stopped"
 

@@ -19,18 +19,19 @@ type Application = String
 type Argument = String
 
 
-findApp :: Application -> Moonbase FilePath
+findApp :: (MonadIO m) => Application -> m (Maybe FilePath)
 findApp
-    app = check =<< io (findExecutable app)
-    where
-        check (Nothing) = throwError $ AppNotFound app
-        check (Just x)  = return x 
+    app = io (findExecutable app)
 
 
-spawn:: Application -> [Argument] -> Moonbase ProcessHandle
+spawn:: (Logger m, MonadIO m) =>  Application -> [Argument] -> m (Maybe ProcessHandle)
 spawn
     app args = do
         debugM $ " --: spawning " ++ app
         exec <- findApp app
-        io $ spawnProcess exec args
+        case exec of 
+         Nothing -> return Nothing
+         Just e -> do
+                    hdl <- io $ spawnProcess e args
+                    return $ Just hdl
 
