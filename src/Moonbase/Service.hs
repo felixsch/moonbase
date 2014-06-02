@@ -1,3 +1,9 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RankNTypes #-}
+
 module Moonbase.Service
     ( startServices
     , stopServices
@@ -8,17 +14,101 @@ module Moonbase.Service
     , dbusListRunningServices
     , dbusStopService
     , dbusStartService
+    -- NEW
+    , NService(..)
     ) where
 
 
 import Control.Applicative
 import Control.Monad.Reader
 import Control.Monad.State
+import Control.Monad.Error
 
+
+import Data.Monoid
+import Data.Maybe
 import qualified Data.Map as M
 
 import Moonbase.Core
 import Moonbase.Log
+
+
+
+-- NEW
+
+data ServiceError = ServiceError String
+                  | ServiceWarning  String
+                  | ServiceFatalError String Bool
+
+instance Error ServiceError where
+    noMsg  = ServiceError "A unknown error occured!"
+    strMsg = ServiceError
+
+
+newtype ServiceT st m a = ServiceT (StateT st (ErrorT ServiceError m) a)
+    deriving (Functor, Monad, MonadIO, MonadState st, MonadError ServiceError)
+
+instance (Monad m, Monoid a) => Monoid (ServiceT m st a) where
+    mempty = return mempty
+    mappend = liftM2 mappend
+   
+instance Applicative (ServiceT st) where
+    pure = return
+    (<*>) = ap
+
+class (Monad m) => NewService m st where
+
+    initState :: ServiceT st m st
+
+    startService :: ServiceT st m Bool
+    stopService  :: ServiceT st m ()
+    
+    restartService :: ServiceT st m Bool 
+
+    isServiceRunning :: ServiceT st m Bool
+
+
+
+runServiceT :: ServiceT st a -> st -> Moonbase (a, st)
+runServiceT (ServiceT cmd) = runStateT cmd
+
+nstartServices :: [NService st] -> Moonbase [NService st]
+nstartServices s = catMaybes <$> mapM startS s
+    where
+      startS (NService n i) = do
+        (is, sta) <- runServiceT nstart i
+        return $ if is then Just $ NService n sta else Nothing
+
+
+
+data SampleService = Int
+
+instance NStartStop (ServiceT SampleService) where
+    nstart = modify ((+1) :: Int -> Int) >> return True
+    nstop  = return ()
+    nisRunning = return True
+
+newSample :: Int -> NService SampleService
+newSample = NService "IntegerSample"
+
+
+
+
+data Sample = Sample
+  { a :: String
+  , b :: forall st. [NService st]
+  }
+
+sample :: Sample
+sample = Sample
+    { a = "Moep"
+    , b = [newSample 12]
+    }
+
+
+-- END
+
+
 
 startServices :: Moonbase ()
 startServices
@@ -58,10 +148,6 @@ askService
             | n  == sn = Just x
             | otherwise = search xs
         search [] = Nothing
-
-isServiceRunning :: Name -> Moonbase Bool
-isServiceRunning
-    sn = M.member sn . services <$> get
 
 dbusListAllServices :: Moonbase [String]
 dbusListAllServices
