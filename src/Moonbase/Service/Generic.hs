@@ -1,3 +1,5 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
+
 module Moonbase.Service.Generic
     ( GenericService(..)
     , newGenericService
@@ -20,18 +22,18 @@ data GenericService = GenericService String [String] (Maybe ProcessHandle)
 
 instance Requires GenericService
 
-instance IsService GenericService where
+instance StartStop GenericService ServiceT where
     initState = return $ GenericService "" [] Nothing
-    startService = do
+    start = do
         (GenericService cmd args _) <- get
         hdl <- spawn cmd args
         put $ GenericService cmd args hdl
         return True
-    stopService = do
+    stop = do
         (GenericService _  _ hdl) <- get
         maybe (return ()) (io . terminateProcess) hdl
 
-    isServiceRunning = do
+    isRunning = do
         (GenericService _ _ hdl) <- get
         isJust <$> getExitCode hdl
         where

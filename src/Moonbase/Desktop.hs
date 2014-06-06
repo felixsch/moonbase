@@ -15,6 +15,17 @@ import Moonbase.Core
 import Moonbase.Log
 import Moonbase.Desktop.Generic
 
+
+nstartDesktop :: Moonbase ()
+nstartDesktop
+    = do
+        infoM "Starting Desktop..."
+        
+
+
+
+
+
 startDesktop :: Moonbase ()
 startDesktop
     = do

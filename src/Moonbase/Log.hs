@@ -4,6 +4,7 @@ module Moonbase.Log
     , formatMessage
     ) where
 
+import System.IO
 import System.Locale (defaultTimeLocale, rfc822DateFormat)
 
 import Data.Time.Clock (getCurrentTime)
@@ -27,9 +28,32 @@ instance Show LogTag where
     show (CustomTag msg) = "(" ++ msg ++ ") " 
 
 
-class (Monad m) => Logger m where
+class (Monad m, MonadIO m) => Logger m where
+
+    getVerbose :: m Bool
+    getLogName :: m (Maybe String)
+    getHdl :: m Handle
+ 
     logM :: LogTag -> String -> m ()
+    logM tag msg = do
+        verbose <- getVerbose
+        name <- getLogName
+        hdl <- getHdl
+        
+        message <- formatMessage tag name msg
+
+        liftIO $ hPutStrLn hdl message >> hFlush hdl
+        when verbose $ liftIO $ putStrLn message
+
     debugM :: String -> m ()
+    debugM msg = do
+        hdl <- getHdl
+        verbose <- getVerbose
+        name <- getLogName
+
+        message <- formatMessage DebugTag name msg
+
+        when verbose $ liftIO $ hPutStrLn hdl message >> hFlush hdl
 
     errorM :: String -> m ()
     errorM = logM ErrorTag
@@ -39,6 +63,7 @@ class (Monad m) => Logger m where
 
     warnM :: String -> m ()
     warnM = logM WarningTag
+
 
 
 

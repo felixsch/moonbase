@@ -1,8 +1,7 @@
-{-# LANGUAGE ExistentialQuantification, GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, FlexibleContexts #-}
-{-# LANGUAGE InstanceSigs #-}
-{-# LANGUAGE ImpredicativeTypes #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module Moonbase.Core
     ( MoonState(..)
@@ -15,17 +14,19 @@ module Moonbase.Core
     , WindowManager(..)
     , StartStop(..), Requires(..)
     , Preferred(..)
-    , Panel(..)
     , HookType(..)
     , Hook(..)
-    , Desktop(..)
     , askRef
     , askConf
     --
-    , IsService(..)
     , ServiceError(..)
     , Service(..)
+    , ServiceT(..)
     , runServiceT
+    --
+    , DesktopT(..)
+    , Desktop(..)
+    , DesktopError(..)
     ) where
 
 import System.IO
@@ -88,7 +89,7 @@ type MoonRuntime = IORef MoonState
 newtype Moonbase a = Moonbase (ReaderT (MoonConfig, MoonRuntime) (ExceptT MoonError IO) a)
     deriving (Functor, Monad, MonadIO, MonadReader (MoonConfig, MoonRuntime), MonadError MoonError)
 
-class (MonadIO m, Logger m, Applicative m) => MonadMB m where
+class (Monad m, MonadIO m, Logger m) => MonadMB m where
     moon :: Moonbase a -> m a
 
 instance MonadMB Moonbase where
@@ -118,34 +119,47 @@ instance (Monoid a) => Monoid (Moonbase a) where
     mempty = return mempty
     mappend = liftM2 mappend
 
-
 instance Logger Moonbase where
-    logM tag msg = do
-        hdl <- logHdl <$> get
-        verbose <- logVerbose <$> get
-        message <- formatMessage tag Nothing msg
-        io $ hPutStrLn hdl message >> hFlush hdl
-        when verbose $ io $ putStrLn message
-
-    debugM msg = do
-        hdl <- logHdl <$> get
-        verbose <- logVerbose <$> get
-        message <- formatMessage DebugTag Nothing msg
-        when verbose $ io $ hPutStrLn hdl message >> hFlush hdl
-        when verbose $ io $ putStrLn message
+    getLogName = return Nothing
+    getVerbose = logVerbose <$> get
+    getHdl = logHdl <$> get
 
 
-class StartStop a where
-    start :: a -> Moonbase a
-    stop :: a -> Moonbase ()
+class (MonadMB (m st)) => StartStop st m where
+    initState :: m st st
+    start :: m st Bool
+    stop :: m st ()
 
-    restart :: a -> Moonbase a
+    restart :: m st Bool
     restart = stop >> start
 
-    isRunning :: a -> Moonbase Bool
-    isRunning _ = return True
+    isRunning :: m st Bool
 
--- Services
+
+-- Desktop --------------------------------------------------------------------
+data DesktopError = DesktopError String
+
+newtype DesktopT st a = DesktopT (StateT st (ExceptT DesktopError Moonbase) a)
+    deriving (Functor, Monad, MonadIO, MonadState st, MonadError DesktopError)
+
+runDesktopT ::  DesktopT st a -> st -> Moonbase (Either DesktopError (a, st))
+runDesktopT (DesktopT cmd) = runExceptT . runStateT cmd
+
+instance Applicative (DesktopT st) where
+    pure = return
+    (<*>) = ap
+
+instance MonadMB (DesktopT st) where
+    moon = DesktopT . lift . lift
+
+instance Logger (DesktopT st) where
+    getHdl = logHdl <$> moon get
+    getVerbose = logVerbose <$> moon get
+    getLogName = return $ Just "Desktop"
+
+data Desktop = forall st. (Requires st, StartStop st DesktopT) => Desktop Name st
+
+-- Service --------------------------------------------------------------------
 
 data ServiceError = ServiceError String
                   | ServiceWarning  String
@@ -171,58 +185,69 @@ instance Applicative (ServiceT st) where
     (<*>) = ap
 
 instance Logger (ServiceT st) where
-    logM tag msg = do
-        hdl <- logHdl <$> moon get
-        verbose <- logVerbose <$> moon get
-        message <- formatMessage tag (Just "Service") msg
-        io $ hPutStrLn hdl message >> hFlush hdl
-        when verbose $ io $ putStrLn message
+    getLogName = return $ Just "Service"
+    getVerbose = logVerbose <$> moon get
+    getHdl     = logHdl <$> moon get
 
-    debugM msg = do
-        hdl <- logHdl <$> moon get
-        verbose <- logVerbose <$> moon get
-        message <- formatMessage DebugTag (Just "Service") msg
-        io $ hPutStrLn hdl message >> hFlush hdl
-        when verbose $ io $ putStrLn message
-
-class IsService st where
-
-    initState :: ServiceT st st
-
-    startService :: ServiceT st Bool
-    stopService  :: ServiceT st ()
-    
-    restartService :: ServiceT st Bool 
-    restartService = stopService >> startService
-
-    isServiceRunning :: ServiceT st Bool
-
-
-data Service = forall st. (Requires st, IsService st) => Service Name st
+data Service = forall st. (Requires st, (StartStop st ServiceT)) => Service Name st
 
 runServiceT :: ServiceT st a -> st -> Moonbase (Either ServiceError (a, st))
 runServiceT (ServiceT cmd) = runExceptT . runStateT cmd
 
 
--- Service End 
+-- WindowManager --------------------------------------------------------------
 
-instance StartStop Desktop where
-    start (Desktop n a) = Desktop n <$> start a
-    stop  (Desktop _ a) = stop a
+data WMError = WMError String
+    deriving (Show)
 
-    isRunning (Desktop _ a) = isRunning a
+newtype WindowManagerT st a = WindowManagerT (StateT st (ExceptT WMError Moonbase) a)
+    deriving (Functor, Monad, MonadIO, MonadState st, MonadError WMError)
 
-instance StartStop WindowManager where
-    start (WindowManager n a) = WindowManager n <$> start a
-    stop  (WindowManager _ a) = stop a
+instance MonadMB (WindowManagerT st) where
+    moon = WindowManagerT . lift . lift
 
-    isRunning (WindowManager _ a) = isRunning a
+instance (Monoid a) => Monoid (WindowManagerT st a) where
+    mempty = return mempty
+    mappend = liftM2 mappend
 
-instance StartStop Panel where
-    start (Panel n a) = Panel n <$> start a
-    stop  (Panel _ a) = stop a
+instance Applicative (WindowManagerT st) where
+    pure = return
+    (<*>) = ap
 
-    isRunning (Panel _ a) = isRunning a
+instance Logger (WindowManagerT st) where
+    getLogName = return $ Just "WindowManager"
+    getVerbose = logVerbose <$> moon get
+    getHdl     = logHdl <$> moon get
+
+data WindowManager = forall st. (Requires st, StartStop st WindowManagerT) => WindowManager Name st
+
+-- Panel ----------------------------------------------------------------------
+
+data PanelError = PanelError String
+
+newtype PanelT st a = PanelT (StateT st (ExceptT PanelError Moonbase) a)
+    deriving (Functor, Monad, MonadIO, MonadState st, MonadError PanelError)
+
+
+instance MonadMB (PanelT st) where
+    moon = PanelT . lift . lift
+
+instance (Monoid a) => Monoid (PanelT st a) where
+    mempty = return mempty
+    mappend = liftM2 mappend
+
+instance Applicative (PanelT st) where
+    pure = return
+    (<*>) = ap
+
+instance Logger (PanelT st) where
+    getLogName = return $ Just "Panel"
+    getVerbose = logVerbose <$> moon get
+    getHdl     = logHdl <$> moon get
+
+data Panel = forall st. (Requires st, StartStop st PanelT) => Panel Name st
+
+-- Hook -----------------------------------------------------------------------
 
 data HookType = HookStart
                   | HookAfterStartup
@@ -253,12 +278,9 @@ instance Requires Panel where
     requires (Panel _ a) = requires a
 
 
+--data WindowManager = forall a. (Requires a, StartStop a) => WindowManager Name a
 
-data Desktop = forall a. (Requires a, StartStop a) => Desktop Name a
-
-data WindowManager = forall a. (Requires a, StartStop a) => WindowManager Name a
-
-data Panel = forall a. (Requires a, StartStop a) => Panel Name a
+--data Panel = forall a. (Requires a, StartStop a) => Panel Name a
 
 
 data Preferred = Entry DesktopEntry

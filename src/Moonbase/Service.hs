@@ -32,7 +32,7 @@ startService'
     (Service n a) = do
         infoM $ "Starting service: " ++ n
         old <- get
-        sta <- runServiceT startService a
+        sta <- runServiceT start a
         case sta of 
             Left err            -> handleServiceError err
             Right (started, st) -> ifStarted n started st old
@@ -45,7 +45,7 @@ startService'
 stopService' :: Service -> Moonbase ()
 stopService' (Service n a) = do
     infoM $ "Stoping service: " ++ n
-    _ <- runServiceT stopService a
+    _ <- runServiceT stop a
     st <- get
     put $ st { services = M.delete n (services st) }
 
