@@ -6,36 +6,35 @@ module Moonbase.Desktop
     , newGenericDesktop
     ) where
 
+import Control.Applicative
 
 import Control.Monad.State
+import Control.Monad.Error (throwError)
 
-import Data.Maybe
 
 import Moonbase.Core
 import Moonbase.Log
 import Moonbase.Desktop.Generic
 
 
-nstartDesktop :: Moonbase ()
-nstartDesktop
-    = do
-        infoM "Starting Desktop..."
-        
-
-
+handleDesktopError :: DesktopError -> Moonbase ()
+handleDesktopError (DesktopError msg) = throwError $ FatalError msg
 
 
 
 startDesktop :: Moonbase ()
 startDesktop
     = do
-        infoM "Starting desktop..."
-        st <- get
-        d <- start . desktop =<< askConf
-        put $ st { desk = Just d }
+        (Desktop n st) <- desktop <$> askConf
+        infoM $ "Starting Desktop " ++ n ++ "..."
+        sta <- runDesktopT start st
+        case sta of
+            Left err -> handleDesktopError err
+            Right (started, nst) -> if started
+                then warnM "Desktop is allready running."
+                else modify (\x -> x { desk = Just $ Desktop n nst })
 
 stopDesktop :: Moonbase ()
 stopDesktop
-    = infoM "Stoping desktop..." >> (stop . fromJust . desk =<< get)
-
-
+    = maybe (warnM "Desktop is not started.")
+            (\(Desktop _ st) -> void $ runDesktopT stop st) =<< desk <$> get

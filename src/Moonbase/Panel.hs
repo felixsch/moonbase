@@ -17,26 +17,34 @@ import Moonbase.Core
 import Moonbase.Log
 
 
+handlePanelError :: PanelError -> Moonbase ()
+handlePanelError (PanelError msg) = errorM $ " PanelError: " ++ msg
+
+
+startPanel :: Panel -> Moonbase ()
+startPanel (Panel n st) = do
+    infoM $ "Starting panel: " ++ n
+    sta <- runPanelT start st
+    case sta of
+        Left err -> handlePanelError err
+        Right (started, nst) -> if started
+            then modify (\x -> x { pnls = M.insert n (Panel n nst) (pnls x) })
+            else warnM $ "Starting panel " ++ n ++ " failed!"
+
+stopPanel :: Panel -> Moonbase ()
+stopPanel (Panel n st) = do
+    debugM $ "Stoping panel " ++ n ++ "..."
+    _ <- runPanelT stop st
+    modify (\x -> x { pnls = M.delete n (pnls x)})
+
 
 startPanels :: Moonbase ()
-startPanels
-    = mapM_ start' =<< panels <$> askConf
-    where
-        start' (Panel n p) = do
-            st <- get
-            infoM $ " --: starting panel: " ++ n
-            np <- start p
-            modify (\x -> x { pnls = M.insert n (Panel n np) (pnls st) })
+startPanels = mapM_ startPanel =<< panels <$> askConf
 
 
 stopPanels :: Moonbase ()
-stopPanels
-    = mapM_ stop' =<< M.elems . pnls <$> get
-    where
-        stop' (Panel n p) = do
-            debugM $ " --: Stoping panel: " ++ n
-            stop p
-            modify (\st -> st { pnls = M.delete n (pnls st)}) 
+stopPanels = mapM_ stopPanel =<< M.elems . pnls <$> get
+
 
 
 getPanel :: Name -> Moonbase (Maybe Panel)
@@ -76,20 +84,20 @@ dbusStartPanel
         notR <- not <$> isPanelRunning n
         when notR (start' =<< askPanel n)
     where
-        start' Nothing            = warnM $ "Could not start panel " ++ n ++ ": panel unknown"
-        start' (Just (Panel _ p)) = do
-            debugM $ "dbus --> starting panel: " ++ n
-            np <- start p
-            putPanel $ Panel n np
+        
+        start' Nothing  = warnM $ "Could not start panel " ++ n ++ ": panel unknown"
+        start' (Just p) = startPanel p
+
+
 
 dbusStopPanel :: Name -> Moonbase ()
 dbusStopPanel
     n = perform =<< getPanel n
     where
         perform Nothing = warnM $ "Could not stop panel " ++ n ++ ": panel unknown"
-        perform (Just (Panel _ p)) = do
+        perform (Just p) = do
             debugM $ "dbus --> stoping panel: " ++ n
-            stop p
+            stopPanel p
             modify (\st -> st { pnls = M.delete n (pnls st)})
         
         

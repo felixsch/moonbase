@@ -10,23 +10,39 @@ module Moonbase.Core
     , MoonError(..)
     , Moonbase(..)
     , Name
-    , runMoon, io, moon
-    , WindowManager(..)
-    , StartStop(..), Requires(..)
-    , Preferred(..)
-    , HookType(..)
-    , Hook(..)
+    , runMoon
+    , io
+    , moon
     , askRef
     , askConf
+
+    , StartStop(..)
+    , Requires(..)
+
+    , Preferred(..)
     --
-    , ServiceError(..)
-    , Service(..)
+    , HookType(..)
+    , Hook(..)
+    --
     , ServiceT(..)
+    , Service(..)
+    , ServiceError(..)
     , runServiceT
     --
     , DesktopT(..)
     , Desktop(..)
     , DesktopError(..)
+    , runDesktopT
+    --
+    , PanelError(..)
+    , Panel(..)
+    , PanelT(..)
+    , runPanelT
+    --
+    , WindowManagerT(..)
+    , WindowManager(..)
+    , WMError(..)
+    , runWindowManagerT
     ) where
 
 import System.IO
@@ -107,14 +123,6 @@ instance MonadState MoonState Moonbase where
              io $ writeIORef r v
 
 
-askConf :: Moonbase MoonConfig
-askConf
-    = fst <$> ask
-
-askRef :: Moonbase MoonRuntime
-askRef
-    = snd <$> ask
-
 instance (Monoid a) => Monoid (Moonbase a) where
     mempty = return mempty
     mappend = liftM2 mappend
@@ -125,8 +133,45 @@ instance Logger Moonbase where
     getHdl = logHdl <$> get
 
 
+askConf :: Moonbase MoonConfig
+askConf
+    = fst <$> ask
+
+askRef :: Moonbase MoonRuntime
+askRef
+    = snd <$> ask
+
+ 
+runMoon :: MoonConfig -> MoonRuntime -> Moonbase a -> IO (Either MoonError a)
+runMoon
+    conf st (Moonbase a) = runExceptT $ runReaderT a (conf, st)
+
+io :: (MonadIO m) => IO a -> m a
+io
+    = liftIO
+
+-- Hook -----------------------------------------------------------------------
+
+data HookType = HookStart
+                  | HookAfterStartup
+                  | HookBeforeQuit
+                  | HookQuit
+                  deriving(Show, Eq)
+
+
+data Hook = Hook Name HookType (Moonbase ())
+
+instance Eq Hook where
+    (Hook aName aType _) == (Hook bName bType _)  = aName == bName && aType == bType
+
+-- Basic classes --------------------------------------------------------------
+
+class Requires a where
+    requires :: a -> [Hook]
+    requires _ = []
+
+
 class (MonadMB (m st)) => StartStop st m where
-    initState :: m st st
     start :: m st Bool
     stop :: m st ()
 
@@ -157,7 +202,13 @@ instance Logger (DesktopT st) where
     getVerbose = logVerbose <$> moon get
     getLogName = return $ Just "Desktop"
 
+instance Requires Desktop where
+    requires (Desktop _ st) = requires st
+
+
 data Desktop = forall st. (Requires st, StartStop st DesktopT) => Desktop Name st
+
+
 
 -- Service --------------------------------------------------------------------
 
@@ -191,6 +242,9 @@ instance Logger (ServiceT st) where
 
 data Service = forall st. (Requires st, (StartStop st ServiceT)) => Service Name st
 
+instance Requires Service where
+    requires (Service _ st) = requires st
+
 runServiceT :: ServiceT st a -> st -> Moonbase (Either ServiceError (a, st))
 runServiceT (ServiceT cmd) = runExceptT . runStateT cmd
 
@@ -221,6 +275,12 @@ instance Logger (WindowManagerT st) where
 
 data WindowManager = forall st. (Requires st, StartStop st WindowManagerT) => WindowManager Name st
 
+instance Requires WindowManager where
+    requires (WindowManager _ st) = requires st
+
+runWindowManagerT :: WindowManagerT st a -> st -> Moonbase (Either WMError (a, st))
+runWindowManagerT (WindowManagerT cmd) = runExceptT . runStateT cmd
+
 -- Panel ----------------------------------------------------------------------
 
 data PanelError = PanelError String
@@ -247,52 +307,15 @@ instance Logger (PanelT st) where
 
 data Panel = forall st. (Requires st, StartStop st PanelT) => Panel Name st
 
--- Hook -----------------------------------------------------------------------
-
-data HookType = HookStart
-                  | HookAfterStartup
-                  | HookBeforeQuit
-                  | HookQuit
-                  deriving(Show, Eq)
-
-
-data Hook = Hook Name HookType (Moonbase ())
-
-instance Eq Hook where
-    (Hook aName aType _) == (Hook bName bType _)  = aName == bName && aType == bType
-
-class Requires a where
-    requires :: a -> [Hook]
-    requires _ = []
-
-instance Requires Service where
-    requires (Service _ a) = requires a
-
-instance Requires Desktop where
-    requires (Desktop _ a) = requires a
-
-instance Requires WindowManager where
-    requires (WindowManager _ a) = requires a
-
 instance Requires Panel where
-    requires (Panel _ a) = requires a
+    requires (Panel _ st) = requires st
 
+runPanelT :: PanelT st a -> st -> Moonbase (Either PanelError (a,st))
+runPanelT (PanelT cmd) = runExceptT . runStateT cmd 
 
---data WindowManager = forall a. (Requires a, StartStop a) => WindowManager Name a
-
---data Panel = forall a. (Requires a, StartStop a) => Panel Name a
-
-
+-- Preferred ------------------------------------------------------------------
 data Preferred = Entry DesktopEntry
               | AppName String
- 
-runMoon :: MoonConfig -> MoonRuntime -> Moonbase a -> IO (Either MoonError a)
-runMoon
-    conf st (Moonbase a) = runExceptT $ runReaderT a (conf, st)
-
-io :: (MonadIO m) => IO a -> m a
-io
-    = liftIO
 
 
 

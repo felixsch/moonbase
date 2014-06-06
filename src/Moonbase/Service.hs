@@ -1,11 +1,8 @@
-{-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE RankNTypes #-}
-
 module Moonbase.Service
     ( startServices
     , stopServices
+    , startService
+    , stopService
     , getService, putService
     , askService
     , isServiceRunning
@@ -27,8 +24,8 @@ import Moonbase.Log
 import Moonbase.Core
 
 
-startService' :: Service -> Moonbase ()
-startService' 
+startService :: Service -> Moonbase ()
+startService 
     (Service n a) = do
         infoM $ "Starting service: " ++ n
         old <- get
@@ -42,8 +39,8 @@ startService'
         ifStarted na False _ _   = warnM $ " -- starting service " ++ na ++ " failed!"
 
 
-stopService' :: Service -> Moonbase ()
-stopService' (Service n a) = do
+stopService :: Service -> Moonbase ()
+stopService (Service n a) = do
     infoM $ "Stoping service: " ++ n
     _ <- runServiceT stop a
     st <- get
@@ -51,12 +48,12 @@ stopService' (Service n a) = do
 
 
 startServices :: Moonbase ()
-startServices = mapM_ startService' =<< autostart <$> askConf
+startServices = mapM_ startService =<< autostart <$> askConf
 
 
 stopServices :: Moonbase ()
 stopServices
-    = mapM_ stopService' =<< (M.elems . services <$> get)
+    = mapM_ stopService =<< (M.elems . services <$> get)
 
 
 getService :: Name -> Moonbase (Maybe Service)
@@ -98,14 +95,16 @@ dbusStopService
         perform Nothing  = return ()
         perform (Just s) = do
             st <- get
-            stopService' s
+            stopService s
             put $ st { services = M.delete sn (services st) }
 
-iisServiceRunning :: Name -> Moonbase Bool
-iisServiceRunning
+isServiceRunning :: Name -> Moonbase Bool
+isServiceRunning
     sn = M.member sn . services <$> get
+
+
 dbusStartService :: Name -> Moonbase ()
 dbusStartService
     sn = do
-        notRunning <- not <$> iisServiceRunning sn
-        when notRunning (maybe (return ()) startService' =<< askService sn)
+        notRunning <- not <$> isServiceRunning sn
+        when notRunning (maybe (return ()) startService =<< askService sn)

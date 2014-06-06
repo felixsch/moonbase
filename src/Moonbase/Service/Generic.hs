@@ -23,7 +23,6 @@ data GenericService = GenericService String [String] (Maybe ProcessHandle)
 instance Requires GenericService
 
 instance StartStop GenericService ServiceT where
-    initState = return $ GenericService "" [] Nothing
     start = do
         (GenericService cmd args _) <- get
         hdl <- spawn cmd args
