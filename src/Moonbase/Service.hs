@@ -35,7 +35,7 @@ startService
             Right (started, st) -> ifStarted n started st old
 
     where
-        ifStarted na True st old = put $ old { services = M.insert na (Service n st) (services old) }
+        ifStarted na True st old = put $ old { stServices = M.insert na (Service n st) (stServices old) }
         ifStarted na False _ _   = warnM $ " -- starting service " ++ na ++ " failed!"
 
 
@@ -44,7 +44,7 @@ stopService (Service n a) = do
     infoM $ "Stoping service: " ++ n
     _ <- runServiceT stop a
     st <- get
-    put $ st { services = M.delete n (services st) }
+    put $ st { stServices = M.delete n (stServices st) }
 
 
 startServices :: Moonbase ()
@@ -53,16 +53,16 @@ startServices = mapM_ startService =<< autostart <$> askConf
 
 stopServices :: Moonbase ()
 stopServices
-    = mapM_ stopService =<< (M.elems . services <$> get)
+    = mapM_ stopService =<< (M.elems . stServices <$> get)
 
 
 getService :: Name -> Moonbase (Maybe Service)
 getService
-    n = M.lookup n . services <$> get
+    n = M.lookup n . stServices <$> get
 
 putService :: Service -> Moonbase ()
 putService
-    s@(Service n _) = modify (\st -> st { services = M.insert n s (services st)})
+    s@(Service n _) = modify (\st -> st { stServices = M.insert n s (stServices st)})
 
 askService :: Name -> Moonbase (Maybe Service)
 askService 
@@ -85,22 +85,22 @@ dbusListAllServices
 
 dbusListRunningServices :: Moonbase [String]
 dbusListRunningServices
-    = M.keys . services <$> get
+    = M.keys . stServices <$> get
 
 
 dbusStopService :: Name -> Moonbase ()
 dbusStopService
-    sn = perform =<< M.lookup sn <$> (services <$> get)
+    sn = perform =<< M.lookup sn <$> (stServices <$> get)
     where
         perform Nothing  = return ()
         perform (Just s) = do
             st <- get
             stopService s
-            put $ st { services = M.delete sn (services st) }
+            put $ st { stServices = M.delete sn (stServices st) }
 
 isServiceRunning :: Name -> Moonbase Bool
 isServiceRunning
-    sn = M.member sn . services <$> get
+    sn = M.member sn . stServices <$> get
 
 
 dbusStartService :: Name -> Moonbase ()

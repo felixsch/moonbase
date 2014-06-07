@@ -28,14 +28,14 @@ startPanel (Panel n st) = do
     case sta of
         Left err -> handlePanelError err
         Right (started, nst) -> if started
-            then modify (\x -> x { pnls = M.insert n (Panel n nst) (pnls x) })
+            then modify (\x -> x { stPanels = M.insert n (Panel n nst) (stPanels x) })
             else warnM $ "Starting panel " ++ n ++ " failed!"
 
 stopPanel :: Panel -> Moonbase ()
 stopPanel (Panel n st) = do
     debugM $ "Stoping panel " ++ n ++ "..."
     _ <- runPanelT stop st
-    modify (\x -> x { pnls = M.delete n (pnls x)})
+    modify (\x -> x { stPanels = M.delete n (stPanels x)})
 
 
 startPanels :: Moonbase ()
@@ -43,17 +43,17 @@ startPanels = mapM_ startPanel =<< panels <$> askConf
 
 
 stopPanels :: Moonbase ()
-stopPanels = mapM_ stopPanel =<< M.elems . pnls <$> get
+stopPanels = mapM_ stopPanel =<< M.elems . stPanels <$> get
 
 
 
 getPanel :: Name -> Moonbase (Maybe Panel)
 getPanel
-    n = M.lookup n . pnls <$> get
+    n = M.lookup n . stPanels <$> get
 
 putPanel :: Panel -> Moonbase () 
 putPanel 
-    p@(Panel n _) = modify (\st -> st { pnls = M.insert n p (pnls st) })
+    p@(Panel n _) = modify (\st -> st { stPanels = M.insert n p (stPanels st) })
 
 askPanel :: Name -> Moonbase (Maybe Panel)
 askPanel
@@ -66,11 +66,11 @@ askPanel
 
 isPanelRunning :: Name -> Moonbase Bool
 isPanelRunning
-    n = M.member n . pnls <$> get
+    n = M.member n . stPanels <$> get
 
 dbusListRunningPanels :: Moonbase [String]
 dbusListRunningPanels
-    = M.keys . pnls <$> get
+    = M.keys . stPanels <$> get
 
 
 dbusListAllPanels :: Moonbase [String]
@@ -98,7 +98,7 @@ dbusStopPanel
         perform (Just p) = do
             debugM $ "dbus --> stoping panel: " ++ n
             stopPanel p
-            modify (\st -> st { pnls = M.delete n (pnls st)})
+            modify (\st -> st { stPanels = M.delete n (stPanels st)})
         
         
           

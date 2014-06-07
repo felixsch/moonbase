@@ -89,13 +89,13 @@ newMoonState
         return MoonState
             { quit   = q
             , dbus   = client
-            , wm     = Nothing
-            , desk   = Nothing
             , logHdl = hdl
             , logVerbose = True
-            , services = M.empty
-            , pnls = M.empty
-            , hks  = []
+            , stServices = M.empty
+            , stPanels = M.empty
+            , stHooks  = []
+            , stWm     = Nothing
+            , stDesktop   = Nothing
             }
 
 startMoonbase :: Moonbase ()

@@ -12,7 +12,7 @@ handleWMError (WMError msg) = throwError $ FatalError msg
 
 startWindowManager :: Moonbase ()
 startWindowManager = do
-        (WindowManager n st) <- windowManager <$> askConf
+        (WindowManager n st) <- wm <$> askConf
         infoM $ "Starting windowmanager: " ++ n
         
         sta <- runWindowManagerT start st
@@ -20,11 +20,11 @@ startWindowManager = do
         case sta of 
             Left err            -> handleWMError err
             Right (started, nst) -> if started
-                then modify (\x -> x { wm = Just $ WindowManager n nst})
+                then modify (\x -> x { stWm = Just $ WindowManager n nst})
                 else errorM "Windowmanager starting failed..."
 
 stopWindowManager :: Moonbase ()
 stopWindowManager = do
-    mwm <- wm <$> get
+    mwm <- stWm <$> get
     maybe (errorM "Tried to stop the windowmanager. But it was not started..")
           (\(WindowManager _ st) -> void $ runWindowManagerT stop st) mwm

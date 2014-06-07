@@ -31,10 +31,10 @@ setRoot
 defaultConfig :: MoonConfig 
 defaultConfig
     = MoonConfig
-    { windowManager = openbox []
+    { wm = openbox []
     , autostart = [xfcePanel]
     , preferred = samplePreferred
-    , desktop   = setRoot "#ff0000"
+    , desk   = setRoot "#ff0000"
     , panels = []
     , hooks = []
     }

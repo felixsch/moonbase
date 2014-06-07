@@ -71,22 +71,24 @@ type Name = String
 data MoonState = MoonState
   { quit   :: Trigger                   -- ^ MVar to triggere the quit event
   , dbus   :: Client                    -- ^ The core moonbase dbus session
-  , wm     :: Maybe WindowManager       -- ^ Windowmanager implementation is saved here
-  , desk   :: Maybe Desktop             -- ^ Desktop instance
+
   , logHdl :: Handle                    -- ^ FileHandle to logfile
   , logVerbose :: Bool                  -- ^ Log to stdout and file
-  , services :: M.Map Name Service    -- ^ All started services
-  , pnls    :: M.Map Name Panel       -- ^ All running panels
-  , hks     :: [Hook]                   -- ^ Enabled hooks
+
+  , stServices :: M.Map Name Service    -- ^ All started services
+  , stPanels    :: M.Map Name Panel       -- ^ All running panels
+  , stHooks     :: [Hook]                   -- ^ Enabled hooks
+  , stWm     :: Maybe WindowManager       -- ^ Windowmanager implementation is saved here
+  , stDesktop   :: Maybe Desktop             -- ^ Desktop instance
   }
 
 -- | Moonbase user configuration
 -- Every user should create his own configuration as he needs
 data MoonConfig = MoonConfig 
-    { windowManager :: WindowManager            -- ^ Windowmanager definition 
+    { wm :: WindowManager            -- ^ Windowmanager definition 
     , autostart     :: [Service]                -- ^ Many services which should be started
     , preferred      :: M.Map String Preferred  -- ^ A map of preffered applications for each mimetype
-    , desktop :: Desktop
+    , desk :: Desktop
     , panels :: [Panel]
     , hooks :: [Hook]
     }
@@ -187,12 +189,13 @@ data DesktopError = DesktopError String
 newtype DesktopT st a = DesktopT (StateT st (ExceptT DesktopError Moonbase) a)
     deriving (Functor, Monad, MonadIO, MonadState st, MonadError DesktopError)
 
-runDesktopT ::  DesktopT st a -> st -> Moonbase (Either DesktopError (a, st))
-runDesktopT (DesktopT cmd) = runExceptT . runStateT cmd
-
 instance Applicative (DesktopT st) where
     pure = return
     (<*>) = ap
+
+instance (Monoid a) => Monoid (DesktopT st a) where
+    mempty = return mempty
+    mappend = liftM2 mappend
 
 instance MonadMB (DesktopT st) where
     moon = DesktopT . lift . lift
@@ -206,9 +209,13 @@ instance Requires Desktop where
     requires (Desktop _ st) = requires st
 
 
-data Desktop = forall st. (Requires st, StartStop st DesktopT) => Desktop Name st
+data Desktop = forall st. (Requires st, StartStop st DesktopT) => Desktop
+  { desktopName :: Name
+  , desktop :: st }
 
 
+runDesktopT ::  DesktopT st a -> st -> Moonbase (Either DesktopError (a, st))
+runDesktopT (DesktopT cmd) = runExceptT . runStateT cmd
 
 -- Service --------------------------------------------------------------------
 
@@ -240,7 +247,9 @@ instance Logger (ServiceT st) where
     getVerbose = logVerbose <$> moon get
     getHdl     = logHdl <$> moon get
 
-data Service = forall st. (Requires st, (StartStop st ServiceT)) => Service Name st
+data Service = forall st. (Requires st, (StartStop st ServiceT)) => Service
+  { serviceName :: Name
+  , service :: st }
 
 instance Requires Service where
     requires (Service _ st) = requires st
@@ -273,7 +282,9 @@ instance Logger (WindowManagerT st) where
     getVerbose = logVerbose <$> moon get
     getHdl     = logHdl <$> moon get
 
-data WindowManager = forall st. (Requires st, StartStop st WindowManagerT) => WindowManager Name st
+data WindowManager = forall st. (Requires st, StartStop st WindowManagerT) => WindowManager
+  { wmName :: Name
+  , windowmanager :: st }
 
 instance Requires WindowManager where
     requires (WindowManager _ st) = requires st
@@ -305,7 +316,9 @@ instance Logger (PanelT st) where
     getVerbose = logVerbose <$> moon get
     getHdl     = logHdl <$> moon get
 
-data Panel = forall st. (Requires st, StartStop st PanelT) => Panel Name st
+data Panel = forall st. (Requires st, StartStop st PanelT) => Panel 
+  { panelName :: Name
+  , panel :: st }
 
 instance Requires Panel where
     requires (Panel _ st) = requires st

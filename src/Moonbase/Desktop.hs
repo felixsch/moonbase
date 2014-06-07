@@ -25,16 +25,16 @@ handleDesktopError (DesktopError msg) = throwError $ FatalError msg
 startDesktop :: Moonbase ()
 startDesktop
     = do
-        (Desktop n st) <- desktop <$> askConf
+        (Desktop n st) <- desk <$> askConf
         infoM $ "Starting Desktop " ++ n ++ "..."
         sta <- runDesktopT start st
         case sta of
             Left err -> handleDesktopError err
             Right (started, nst) -> if started
                 then warnM "Desktop is allready running."
-                else modify (\x -> x { desk = Just $ Desktop n nst })
+                else modify (\x -> x { stDesktop = Just $ Desktop n nst })
 
 stopDesktop :: Moonbase ()
 stopDesktop
     = maybe (warnM "Desktop is not started.")
-            (\(Desktop _ st) -> void $ runDesktopT stop st) =<< desk <$> get
+            (\(Desktop _ st) -> void $ runDesktopT stop st) =<< stDesktop <$> get
