@@ -5,7 +5,7 @@ module Moonbase.Util.Application
     , spawn
     ) where
 
-import Control.Monad.Error
+import Control.Monad.Except
 
 import System.Process (spawnProcess, ProcessHandle)
 import System.Directory (findExecutable)

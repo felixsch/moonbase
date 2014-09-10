@@ -27,7 +27,6 @@ setRoot
     color = newGenericDesktop "xsetroot" ["-solid", color]
 
 
-
 defaultConfig :: MoonConfig 
 defaultConfig
     = MoonConfig

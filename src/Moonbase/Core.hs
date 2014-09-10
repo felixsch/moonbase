@@ -1,12 +1,14 @@
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module Moonbase.Core
-    ( MoonState(..)
-    , MoonConfig(..)
-    , MoonRuntime
+    ( Runtime(..)
+    , Config(..)
+    , RuntimeRef
     , MoonError(..)
     , Moonbase(..)
     , Name
@@ -52,12 +54,15 @@ import Data.Monoid
 import qualified Data.Map as M
 
 import Control.Applicative
-
-import Data.IORef
+import Control.Monad.Base
 import Control.Monad.Reader
 import Control.Monad.State
 import Control.Monad.Trans.Except
-import Control.Monad.Error
+import Control.Monad.Except
+import Control.Monad.STM (atomically)
+import Control.Monad.Trans.Control
+
+import Control.Concurrent.STM.TVar
 
 import DBus.Client
 
@@ -68,23 +73,23 @@ import Moonbase.Util.Trigger
 type Name = String
 
 -- | Moonbase basic read write state
-data MoonState = MoonState
-  { quit   :: Trigger                   -- ^ MVar to triggere the quit event
-  , dbus   :: Client                    -- ^ The core moonbase dbus session
+data Runtime = Runtime
+  { quit        :: Trigger                   -- ^ MVar to triggere the quit event
+  , dbus        :: Client                    -- ^ The core moonbase dbus session
 
-  , logHdl :: Handle                    -- ^ FileHandle to logfile
-  , logVerbose :: Bool                  -- ^ Log to stdout and file
+  , logHdl      :: Handle                    -- ^ FileHandle to logfile
+  , logVerbose  :: Bool                  -- ^ Log to stdout and file
 
-  , stServices :: M.Map Name Service    -- ^ All started services
+  , stServices  :: M.Map Name Service    -- ^ All started services
   , stPanels    :: M.Map Name Panel       -- ^ All running panels
   , stHooks     :: [Hook]                   -- ^ Enabled hooks
-  , stWm     :: Maybe WindowManager       -- ^ Windowmanager implementation is saved here
+  , stWm        :: Maybe WindowManager       -- ^ Windowmanager implementation is saved here
   , stDesktop   :: Maybe Desktop             -- ^ Desktop instance
   }
 
 -- | Moonbase user configuration
 -- Every user should create his own configuration as he needs
-data MoonConfig = MoonConfig 
+data Config = Config
     { wm :: WindowManager            -- ^ Windowmanager definition 
     , autostart     :: [Service]                -- ^ Many services which should be started
     , preferred      :: M.Map String Preferred  -- ^ A map of preffered applications for each mimetype
@@ -101,29 +106,35 @@ data MoonError = ErrorMessage String  -- ^ generic Error
                deriving (Show)
 
 
+type RuntimeRef = TVar Runtime
+type MoonbaseT = ReaderT (Config, RuntimeRef) (ExceptT MoonError IO)
 
-type MoonRuntime = IORef MoonState
+newtype Moonbase a = Moonbase { runMoonbase :: MoonbaseT a }
+    deriving (Functor, Monad, MonadIO, MonadReader (Config, RuntimeRef), MonadError MoonError)
 
-newtype Moonbase a = Moonbase (ReaderT (MoonConfig, MoonRuntime) (ExceptT MoonError IO) a)
-    deriving (Functor, Monad, MonadIO, MonadReader (MoonConfig, MoonRuntime), MonadError MoonError)
+instance  Applicative Moonbase where
+    pure  = return
+    (<*>) = ap
 
-class (Monad m, MonadIO m, Logger m) => MonadMB m where
-    moon :: Moonbase a -> m a
+instance MonadBase IO Moonbase where
+    liftBase = Moonbase . lift . lift
 
-instance MonadMB Moonbase where
-    moon = id
+instance MonadBaseControl IO Moonbase where
+    newtype StM Moonbase a = StMoonbase { unStMoonbase :: StM MoonbaseT a }
+    liftBaseWith f = Moonbase (liftBaseWith (\runIO -> f (fmap StMoonbase . runIO . runMoonbase)))
+    restoreM = Moonbase . restoreM . unStMoonbase
 
-instance Applicative Moonbase where
-    pure    = return
-    (<*>)   = ap
+askConf :: Moonbase Config
+askConf = fst <$> ask
 
+askRef :: Moonbase RuntimeRef
+askRef = snd <$> ask
 
-instance MonadState MoonState Moonbase where
-    get = io . readIORef =<< askRef
-    put v = do
-             r <- askRef
-             io $ writeIORef r v
-
+instance MonadState Runtime Moonbase where
+    get = liftIO . readTVarIO =<< askRef
+    put sta = do
+        ref <- askRef
+        liftIO $ atomically $ writeTVar ref sta
 
 instance (Monoid a) => Monoid (Moonbase a) where
     mempty = return mempty
@@ -135,16 +146,9 @@ instance Logger Moonbase where
     getHdl = logHdl <$> get
 
 
-askConf :: Moonbase MoonConfig
-askConf
-    = fst <$> ask
-
-askRef :: Moonbase MoonRuntime
-askRef
-    = snd <$> ask
 
  
-runMoon :: MoonConfig -> MoonRuntime -> Moonbase a -> IO (Either MoonError a)
+runMoon :: Config -> RuntimeRef -> Moonbase a -> IO (Either MoonError a)
 runMoon
     conf st (Moonbase a) = runExceptT $ runReaderT a (conf, st)
 
@@ -168,19 +172,62 @@ instance Eq Hook where
 
 -- Basic classes --------------------------------------------------------------
 
-class Requires a where
-    requires :: a -> [Hook]
-    requires _ = []
+
+class MonadComponent st where 
+    initComponent :: Moonbase st
+
+    requires  :: Maybe [Hook]
+
+    start     :: ComponentM st Bool
+    stop      :: ComponentM st ()
+
+    restart   :: ComponentM st Bool
+    restart   = start >> stop
+
+    isRunning :: Component st Bool
 
 
-class (MonadMB (m st)) => StartStop st m where
-    start :: m st Bool
-    stop :: m st ()
+data ComponentRuntime st = ComponentRuntime 
+  { coName :: Name
+  , coState :: TVar st }
 
-    restart :: m st Bool
-    restart = stop >> start
+newtype Component st a = Component (ReaderT (ComponentRuntime st) Moonbase a)
+    deriving (Functor, Monad, MonadIO, MonadReader (ComponentRuntime st))
 
-    isRunning :: m st Bool
+instance Applicative (Component st) where
+    pure  = return
+    (<*>) = ap
+
+instance MonadBase IO (Component st) where
+    liftBase = Component . lift . liftIO
+
+instance MonadState st (Component st) where
+    get     = liftIO . readTVarIO =<< coState <$> ask
+    put sta =  do
+        ref <- coState <$> ask
+        liftIO $ atomically $ writeTVar ref sta
+
+data Desktop = forall st. (Stateful st) => Desktop
+  { desktopName :: Name
+  , desktop     :: st }
+
+
+data Service = forall st. (Requires st, (StartStop st ServiceT)) => Service
+  { serviceName :: Name
+  , service :: st }
+
+
+
+
+
+{-
+data Desktop = forall st. (Requires st, StartStop st DesktopT) => Desktop
+  { desktopName :: Name
+  , desktop :: st }
+
+
+
+
 
 
 -- Desktop --------------------------------------------------------------------
@@ -197,12 +244,12 @@ instance (Monoid a) => Monoid (DesktopT st a) where
     mempty = return mempty
     mappend = liftM2 mappend
 
-instance MonadMB (DesktopT st) where
-    moon = DesktopT . lift . lift
+instance MonadBase Moonbase (DesktopT st) where
+    liftBase = DesktopT . lift . lift
 
 instance Logger (DesktopT st) where
-    getHdl = logHdl <$> moon get
-    getVerbose = logVerbose <$> moon get
+    getHdl = logHdl <$> liftBase get
+    getVerbose = logVerbose <$> liftBase get
     getLogName = return $ Just "Desktop"
 
 instance Requires Desktop where
@@ -230,8 +277,8 @@ newtype ServiceT st a = ServiceT (StateT st (ExceptT ServiceError Moonbase) a)
     deriving (Functor, Monad, MonadIO, MonadState st, MonadError ServiceError)
 
 
-instance MonadMB (ServiceT st) where
-    moon = ServiceT . lift . lift
+instance MonadBase Moonbase ServiceT where
+    liftBase = ServiceT . lift . lift
 
   
 instance (Monoid a) => Monoid (ServiceT st a) where
@@ -244,8 +291,8 @@ instance Applicative (ServiceT st) where
 
 instance Logger (ServiceT st) where
     getLogName = return $ Just "Service"
-    getVerbose = logVerbose <$> moon get
-    getHdl     = logHdl <$> moon get
+    getVerbose = logVerbose <$> liftBase get
+    getHdl     = logHdl <$> liftBase get
 
 data Service = forall st. (Requires st, (StartStop st ServiceT)) => Service
   { serviceName :: Name
@@ -266,8 +313,8 @@ data WMError = WMError String
 newtype WindowManagerT st a = WindowManagerT (StateT st (ExceptT WMError Moonbase) a)
     deriving (Functor, Monad, MonadIO, MonadState st, MonadError WMError)
 
-instance MonadMB (WindowManagerT st) where
-    moon = WindowManagerT . lift . lift
+instance MonadBase Moonbase WindowManagerT  where
+    liftBase = WindowManagerT . lift . lift
 
 instance (Monoid a) => Monoid (WindowManagerT st a) where
     mempty = return mempty
@@ -279,8 +326,8 @@ instance Applicative (WindowManagerT st) where
 
 instance Logger (WindowManagerT st) where
     getLogName = return $ Just "WindowManager"
-    getVerbose = logVerbose <$> moon get
-    getHdl     = logHdl <$> moon get
+    getVerbose = logVerbose <$> liftBase get
+    getHdl     = logHdl <$> liftBase get
 
 data WindowManager = forall st. (Requires st, StartStop st WindowManagerT) => WindowManager
   { wmName :: Name
@@ -300,8 +347,8 @@ newtype PanelT st a = PanelT (StateT st (ExceptT PanelError Moonbase) a)
     deriving (Functor, Monad, MonadIO, MonadState st, MonadError PanelError)
 
 
-instance MonadMB (PanelT st) where
-    moon = PanelT . lift . lift
+instance MonadBase Moonbase PanelT where
+    liftBase = PanelT . lift . lift
 
 instance (Monoid a) => Monoid (PanelT st a) where
     mempty = return mempty
@@ -313,8 +360,8 @@ instance Applicative (PanelT st) where
 
 instance Logger (PanelT st) where
     getLogName = return $ Just "Panel"
-    getVerbose = logVerbose <$> moon get
-    getHdl     = logHdl <$> moon get
+    getVerbose = logVerbose <$> liftBase get
+    getHdl     = logHdl <$> liftBase get
 
 data Panel = forall st. (Requires st, StartStop st PanelT) => Panel 
   { panelName :: Name
@@ -325,7 +372,7 @@ instance Requires Panel where
 
 runPanelT :: PanelT st a -> st -> Moonbase (Either PanelError (a,st))
 runPanelT (PanelT cmd) = runExceptT . runStateT cmd 
-
+-}
 -- Preferred ------------------------------------------------------------------
 data Preferred = Entry DesktopEntry
               | AppName String

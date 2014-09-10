@@ -2,7 +2,7 @@ module Moonbase.WindowManager where
 
 import Control.Applicative
 import Control.Monad.State
-import Control.Monad.Error (throwError)
+import Control.Monad.Except (throwError)
 
 import Moonbase.Core
 import Moonbase.Log
