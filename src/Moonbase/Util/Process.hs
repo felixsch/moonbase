@@ -2,16 +2,18 @@
 
 module Moonbase.Util.Process 
   ( fork
-  , timeout 
+  , forkIO
+  , timeout
+  , ThreadId
   ) where
 
 import Control.Monad                 ( void )
 import Control.Monad.Trans.Control   ( MonadBaseControl , liftBaseDiscard, liftBaseWith )
-import Control.Monad.IO.Class        ( liftIO )
+import Control.Concurrent            ( forkIO, ThreadId )
 import qualified System.Timeout as T ( timeout )
 
-fork :: (MonadBaseControl IO m) => m () -> m ()
-fork = liftBaseDiscard liftIO
+fork :: (MonadBaseControl IO m) => m () -> m ThreadId
+fork = liftBaseDiscard forkIO
 
 
 timeout :: (MonadBaseControl IO m) => Int -> m () -> m ()

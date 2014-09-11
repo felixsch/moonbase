@@ -64,6 +64,7 @@ library
                     , Moonbase.Preferred
                     , Moonbase.Util.Trigger
                     , Moonbase.Util.Application
+                    , Moonbase.Util.Process
 
   build-depends:      base >=4.6 && <4.8
                     , containers >= 0.5.0.0
