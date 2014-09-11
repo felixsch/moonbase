@@ -19,10 +19,11 @@ loadHooks
         h <- allHooks
         modify (\conf -> conf { stHooks = h })
     where
-        allHooks = nub . concat <$> sequence [one desk, more autostart, more panels, one wm, hooks <$> askConf]
-        one t = requires . t <$> askConf
-        more t = concatMap requires . t <$> askConf
-
+        allHooks = nub . concat <$> mapM (<$> askConf) [ desktopRequires . desk
+                                                       , windowManagerRequires . wm
+                                                       , concatMap panelRequires . panels
+                                                       , concatMap serviceRequires . autostart
+                                                       , hooks ]
 
 runHooks :: HookType -> Moonbase ()
 runHooks

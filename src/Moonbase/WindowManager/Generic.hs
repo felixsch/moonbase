@@ -18,7 +18,7 @@ import Moonbase.Util.Application
 
 data GenericWM = GenericWM String [String] (Maybe ProcessHandle)
 
-instance StartStop GenericWM WindowManagerT where
+instance Component GenericWM where
     start = do
         (GenericWM w args _) <- get
         hdl <- spawn w args
@@ -36,12 +36,9 @@ instance StartStop GenericWM WindowManagerT where
         where
             handle (GenericWM _ _ hdl) = hdl
 
-
-instance Requires GenericWM
-
 newGenericWM :: String -> [String] -> WindowManager
 newGenericWM
-    cmd args = WindowManager cmd $ GenericWM cmd args Nothing
+    cmd args = WindowManager cmd [] $ GenericWM cmd args Nothing
 
 
 

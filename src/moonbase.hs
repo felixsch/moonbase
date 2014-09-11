@@ -27,9 +27,9 @@ setRoot
     color = newGenericDesktop "xsetroot" ["-solid", color]
 
 
-defaultConfig :: MoonConfig 
+defaultConfig :: Config 
 defaultConfig
-    = MoonConfig
+    = Config
     { wm = openbox []
     , autostart = [xfcePanel]
     , preferred = samplePreferred

@@ -9,32 +9,26 @@ module Moonbase.Desktop
 import Control.Applicative
 
 import Control.Monad.State
-import Control.Monad.Except (throwError)
 
 
 import Moonbase.Core
 import Moonbase.Log
+
 import Moonbase.Desktop.Generic
 
-
-handleDesktopError :: DesktopError -> Moonbase ()
-handleDesktopError (DesktopError msg) = throwError $ FatalError msg
-
-
-
 startDesktop :: Moonbase ()
-startDesktop
-    = do
-        (Desktop n st) <- desk <$> askConf
+startDesktop = do
+        (Desktop n _ st) <- desk <$> askConf
+        ref              <- newRef st
+
         infoM $ "Starting Desktop " ++ n ++ "..."
-        sta <- runDesktopT start st
-        case sta of
-            Left err -> handleDesktopError err
-            Right (started, nst) -> if started
-                then warnM "Desktop is allready running."
-                else modify (\x -> x { stDesktop = Just $ Desktop n nst })
+        status <- runComponentM n ref start
+        if status
+            then modify (\x -> x { stDesktop = Just (RefWrapper ref)})
+            else warnM $ "Starting desktop: " ++ n ++ " failed!"
 
 stopDesktop :: Moonbase ()
-stopDesktop
-    = maybe (warnM "Desktop is not started.")
-            (\(Desktop _ st) -> void $ runDesktopT stop st) =<< stDesktop <$> get
+stopDesktop = do
+    maybeDesktop <- stDesktop <$> get
+    (Desktop n _ _) <- desk <$> askConf
+    maybe (errorM "Tried to stop the desktop. But it was not started..") (\(RefWrapper ref) -> void $ runComponentM n ref stop) maybeDesktop

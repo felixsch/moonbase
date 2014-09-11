@@ -19,16 +19,15 @@ import Moonbase.Util.Application
 
 data GenericDesktop = GenericDesktop String [String] (Maybe ProcessHandle)
 
-instance Requires GenericDesktop
 
-instance StartStop GenericDesktop DesktopT where
+instance Component GenericDesktop where
     start = startGenericDesktop
     stop  = stopGenericDesktop
     isRunning = isGenericDesktopRunning
     
     
     
-stopGenericDesktop :: DesktopT GenericDesktop ()
+stopGenericDesktop :: ComponentM GenericDesktop ()
 stopGenericDesktop 
     = do
         (GenericDesktop cmd _ hdl) <- get
@@ -37,7 +36,7 @@ stopGenericDesktop
             else debugM $ cmd ++ " is not running."
 
     
-startGenericDesktop :: DesktopT GenericDesktop Bool 
+startGenericDesktop :: ComponentM GenericDesktop Bool 
 startGenericDesktop
     = do
         (GenericDesktop cmd args hdl) <- get
@@ -51,7 +50,7 @@ startGenericDesktop
           Nothing -> errorM ("Could not start" ++ c) >> return False
           Just x  -> put (GenericDesktop c a (Just x)) >> return True
 
-isGenericDesktopRunning :: DesktopT GenericDesktop Bool
+isGenericDesktopRunning :: ComponentM GenericDesktop Bool
 isGenericDesktopRunning
     = do
         (GenericDesktop _ _ hdl) <- get
@@ -60,7 +59,7 @@ isGenericDesktopRunning
 
 newGenericDesktop :: String -> [String] -> Desktop
 newGenericDesktop 
-    cmd args = Desktop cmd $ GenericDesktop cmd args Nothing
+    cmd args = Desktop cmd [] $ GenericDesktop cmd args Nothing
 
 justBackgroundColor :: String -> Desktop
 justBackgroundColor color = newGenericDesktop "xsetroot" ["-solid", color]

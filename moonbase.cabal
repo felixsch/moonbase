@@ -98,17 +98,21 @@ executable moonbase
   -- other-extensions:    
   
   -- Other library packages from which modules are imported.
+
+
   build-depends:      base >=4.6 && <4.8
                     , containers >= 0.5.0.0
-                    , transformers  >= 0.4.1.0
+                    , transformers >= 0.4.1.0
                     , transformers-base >= 0.4.2
-                    , mtl >= 2.1.2
-                    , dbus >= 0.7.10
+                    , monad-control >= 0.3.3.0
+                    , mtl >= 2.2.1
+                    , dbus >= 0.10.7 
                     , directory >= 1.2.1.0
                     , process >= 1.1.0.2
                     , time >= 1.4.2
                     , old-locale >= 1.0.0.5
                     , xdg >= 0.1.0.0
+                    , stm >= 2.4.2
 
   -- Directories containing source files.
   hs-source-dirs:    src/

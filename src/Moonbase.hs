@@ -11,8 +11,8 @@ import Control.Monad.State
 import qualified Data.Map as M
 
 import DBus.Client
-import Data.IORef
-
+import Control.Monad.STM (atomically)
+import Control.Concurrent.STM.TVar
 import System.IO
 import System.Environment.XDG.BaseDir
 
@@ -82,11 +82,11 @@ openLog
      openFile (dir ++ "moonbase.log") WriteMode
 
         
-newMoonState :: Client -> Handle -> IO MoonState
-newMoonState
+newRuntime :: Client -> Handle -> IO Runtime
+newRuntime
     client hdl = do
         q <- newTrigger
-        return MoonState
+        return Runtime
             { quit   = q
             , dbus   = client
             , logHdl = hdl
@@ -121,12 +121,13 @@ stopMoonbase
     >> runHooks HookQuit
     >> infoM "Stoping moonbase..."
 
-moonbase :: MoonConfig -> IO ()
+moonbase :: Config -> IO ()
 moonbase
     conf = do
             client <- startDbus
             l <- openLog
-            st <- newIORef =<< newMoonState client l
+            runtime <- newRuntime client l
+            st <- atomically $ newTVar runtime
             re <- runMoon conf st exec
             case re of
                 Left err -> handleError err

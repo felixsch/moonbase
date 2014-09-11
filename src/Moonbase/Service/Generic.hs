@@ -20,9 +20,8 @@ import Moonbase.Util.Application
 
 data GenericService = GenericService String [String] (Maybe ProcessHandle)
 
-instance Requires GenericService
 
-instance StartStop GenericService ServiceT where
+instance Component GenericService where
     start = do
         (GenericService cmd args _) <- get
         hdl <- spawn cmd args
@@ -41,4 +40,4 @@ instance StartStop GenericService ServiceT where
 
 newGenericService :: String -> [String] -> Service
 newGenericService 
-    cmd args = Service cmd $ GenericService cmd args Nothing
+    cmd args = Service cmd [] $ GenericService cmd args Nothing

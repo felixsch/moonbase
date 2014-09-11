@@ -14,37 +14,30 @@ module Moonbase.Core
     , Name
     , runMoon
     , io
-    , moon
     , askRef
     , askConf
 
-    , StartStop(..)
-    , Requires(..)
+    , Ref
+    , RefWrapper(..)
+    , newRef
+    , writeRef
+    , readRef
 
-    , Preferred(..)
-    --
+
+    , Component(..)
+    , ComponentM(..)
+    , runComponentM
+    , moon
+
+    , Service(..)
+    , Desktop(..)
+    , Panel(..)
+    , WindowManager(..)
+
     , HookType(..)
     , Hook(..)
-    --
-    , ServiceT(..)
-    , Service(..)
-    , ServiceError(..)
-    , runServiceT
-    --
-    , DesktopT(..)
-    , Desktop(..)
-    , DesktopError(..)
-    , runDesktopT
-    --
-    , PanelError(..)
-    , Panel(..)
-    , PanelT(..)
-    , runPanelT
-    --
-    , WindowManagerT(..)
-    , WindowManager(..)
-    , WMError(..)
-    , runWindowManagerT
+
+    , Preferred(..)
     ) where
 
 import System.IO
@@ -59,9 +52,9 @@ import Control.Monad.Reader
 import Control.Monad.State
 import Control.Monad.Trans.Except
 import Control.Monad.Except
-import Control.Monad.STM (atomically)
 import Control.Monad.Trans.Control
 
+import Control.Monad.STM (atomically)
 import Control.Concurrent.STM.TVar
 
 import DBus.Client
@@ -80,11 +73,11 @@ data Runtime = Runtime
   , logHdl      :: Handle                    -- ^ FileHandle to logfile
   , logVerbose  :: Bool                  -- ^ Log to stdout and file
 
-  , stServices  :: M.Map Name Service    -- ^ All started services
-  , stPanels    :: M.Map Name Panel       -- ^ All running panels
+  , stServices  :: M.Map Name RefWrapper    -- ^ All started services
+  , stPanels    :: M.Map Name RefWrapper       -- ^ All running panels
   , stHooks     :: [Hook]                   -- ^ Enabled hooks
-  , stWm        :: Maybe WindowManager       -- ^ Windowmanager implementation is saved here
-  , stDesktop   :: Maybe Desktop             -- ^ Desktop instance
+  , stWm        :: Maybe RefWrapper      -- ^ Windowmanager implementation is saved here
+  , stDesktop   :: Maybe RefWrapper             -- ^ Desktop instance
   }
 
 -- | Moonbase user configuration
@@ -172,49 +165,84 @@ instance Eq Hook where
 
 -- Basic classes --------------------------------------------------------------
 
+type Ref st = TVar st
 
-class MonadComponent st where 
-    initComponent :: Moonbase st
 
-    requires  :: Maybe [Hook]
+newRef :: (MonadIO m) => st -> m (Ref st)
+newRef = liftIO . atomically . newTVar
+
+writeRef :: (MonadIO m) => Ref st -> st -> m ()
+writeRef state' state'' = liftIO $ atomically $ writeTVar state' state''
+
+readRef :: (MonadIO m) => Ref st -> m st
+readRef = liftIO . readTVarIO
+
+
+data RefWrapper = forall st. (Component st) => RefWrapper (Ref st)
+
+
+
+newtype ComponentM st a = ComponentM (ReaderT (Name, Ref st) Moonbase a)
+    deriving (Functor, Monad, MonadIO, MonadReader (Name, Ref st))
+
+instance Applicative (ComponentM st) where
+    pure  = return
+    (<*>) = ap
+
+instance MonadBase Moonbase (ComponentM st) where
+    liftBase = ComponentM . lift
+
+instance MonadState st (ComponentM st) where
+    get     = readRef =<< snd <$> ask
+    put sta =  do
+        ref <- snd <$> ask
+        writeRef ref sta
+
+instance (Component st) => Logger (ComponentM st) where
+    getHdl = logHdl <$> liftBase get
+    getVerbose = logVerbose <$> liftBase get
+    getLogName = Just <$> componentName
+
+
+runComponentM :: (Component st) => Name -> Ref st -> ComponentM st a -> Moonbase a
+runComponentM name state' (ComponentM cmd) = runReaderT cmd (name, state')
+
+componentName :: ComponentM st Name
+componentName = fst <$> ask
+
+class Component st where 
 
     start     :: ComponentM st Bool
     stop      :: ComponentM st ()
 
     restart   :: ComponentM st Bool
-    restart   = start >> stop
+    restart   = stop >> start
 
-    isRunning :: Component st Bool
+    isRunning :: ComponentM st Bool
 
 
-data ComponentRuntime st = ComponentRuntime 
-  { coName :: Name
-  , coState :: TVar st }
+moon :: (Component st) => Moonbase a -> ComponentM st a
+moon = ComponentM . lift
 
-newtype Component st a = Component (ReaderT (ComponentRuntime st) Moonbase a)
-    deriving (Functor, Monad, MonadIO, MonadReader (ComponentRuntime st))
-
-instance Applicative (Component st) where
-    pure  = return
-    (<*>) = ap
-
-instance MonadBase IO (Component st) where
-    liftBase = Component . lift . liftIO
-
-instance MonadState st (Component st) where
-    get     = liftIO . readTVarIO =<< coState <$> ask
-    put sta =  do
-        ref <- coState <$> ask
-        liftIO $ atomically $ writeTVar ref sta
-
-data Desktop = forall st. (Stateful st) => Desktop
+data Desktop = forall st. (Component st) => Desktop
   { desktopName :: Name
+  , desktopRequires :: [Hook]
   , desktop     :: st }
 
-
-data Service = forall st. (Requires st, (StartStop st ServiceT)) => Service
+data Service = forall st. (Component st) => Service
   { serviceName :: Name
+  , serviceRequires :: [Hook]
   , service :: st }
+
+data Panel = forall st. (Component st) => Panel
+  { panelName :: Name
+  , panelRequires :: [Hook]
+  , panel :: st }
+
+data WindowManager = forall st. (Component st) => WindowManager
+ { windowManagerName :: Name
+ , windowManagerRequires :: [Hook]
+ , windowManager :: st }
 
 
 
