@@ -95,6 +95,7 @@ data Config = Config
 data MoonError = ErrorMessage String  -- ^ generic Error
                | AppNotFound String   -- ^ Application which should be started was not found
                | FatalError String
+               | InitFailed String
                | Quit                 -- ^ Triggeres quit (currently not used)
                deriving (Show)
 
