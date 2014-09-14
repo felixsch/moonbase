@@ -19,7 +19,7 @@ import Moonbase.Log
 
 startPanel :: Panel -> Moonbase ()
 startPanel (Panel n _ st) = do
-    debugM $ "Starting panel: " ++ n
+    infoM $ "Starting panel: " ++ n
 
     ref <- newRef st
     status <- runComponentM n ref start

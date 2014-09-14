@@ -7,8 +7,8 @@ module Moonbase.Log
 import System.IO
 import System.Locale (defaultTimeLocale, rfc822DateFormat)
 
-import Data.Time.Clock (getCurrentTime)
 import Data.Time.Format (formatTime)
+import Data.Time.LocalTime (getZonedTime)
 
 import Control.Applicative 
 import Control.Monad.Reader
@@ -69,7 +69,7 @@ class (Monad m, MonadIO m) => Logger m where
 
 formatMessage :: (MonadIO m) => LogTag -> Maybe String -> String -> m String
 formatMessage tag mo message = liftIO $ do
-    date <- formatTime defaultTimeLocale rfc822DateFormat <$> getCurrentTime
+    date <- formatTime defaultTimeLocale rfc822DateFormat <$> getZonedTime
     return $ case mo of
         Just m  -> "[" ++ date ++ "][" ++ m ++ "] " ++ show tag ++ ": " ++ message
         Nothing -> "[" ++ date ++ "] " ++ show tag ++ ": " ++ message
