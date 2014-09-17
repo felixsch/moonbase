@@ -13,6 +13,9 @@ import qualified Data.Map as M
 import DBus.Client
 import Control.Monad.STM (atomically)
 import Control.Concurrent.STM.TVar
+
+import System.Directory
+import System.FilePath
 import System.IO
 import System.Environment.XDG.BaseDir
 
@@ -35,8 +38,7 @@ moonHome = do
 
 
 startDbus :: IO Client
-startDbus 
-    = do
+startDbus = do
         client <- connectSession
         name   <- requestName client "org.Moonbase.Core" []
         case name of
@@ -44,11 +46,10 @@ startDbus
             _                -> error "Connection to Session Bus failed. Name allready in use"
 
 registerDBus :: Moonbase ()
-registerDBus
-    = do
+registerDBus = do
         ref <- askRef
-        st <- get
-        cf <- askConf        
+        st  <- get
+        cf  <- askConf        
         io $ export (dbus st) "/"
             [ autoMethod core "Quit" (trigger $ quit st)
             , autoMethod core "ListRunningServices" (wrap cf ref dbusListRunningServices)
@@ -62,8 +63,8 @@ registerDBus
             , autoMethod core "StopPanel" (wrap1 cf ref dbusStopPanel)
             ]
     where
-        core = "org.Moonbase.Core"
-        wrap cf ref cmd = justReturn <$> runMoon cf ref cmd
+        core                 = "org.Moonbase.Core"
+        wrap cf ref cmd      = justReturn <$> runMoon cf ref cmd
         wrap1 cf ref cmd arg = justReturn <$> runMoon cf ref (cmd arg)
 
 justReturn :: Either MoonError a -> a
@@ -74,18 +75,26 @@ justReturn (Left (FatalError err)) = error $ "Fatal Error occured: " ++ err
 justReturn (Left (InitFailed err)) = error $ "Could not initialize: " ++ err
 justReturn (Right x) = x
 
- 
+
+
+setupHomeDirectory :: IO ()
+setupHomeDirectory = do
+    dir <- moonHome
+    exists <- doesDirectoryExist dir
+
+    unless exists $ createDirectory dir
             
 openLog :: IO Handle
-openLog
-    = do
+openLog = do
      dir <- moonHome
-     openFile (dir ++ "moonbase.log") WriteMode
+     exists <- doesFileExist (dir </> "moonbase.log")
+
+     unless exists $ writeFile (dir </> "moonbase.log") "" 
+     openFile (dir </> "moonbase.log") WriteMode
 
         
 newRuntime :: Client -> Handle -> IO Runtime
-newRuntime
-    client hdl = do
+newRuntime client hdl = do
         q <- newTrigger
         return Runtime
             { quit   = q
@@ -100,8 +109,7 @@ newRuntime
             }
 
 startMoonbase :: Moonbase ()
-startMoonbase
-    = infoM "Starting moonbase..." 
+startMoonbase = infoM "Starting moonbase..." 
     >> loadHooks
     >> runHooks HookStart
     >> registerDBus
@@ -113,8 +121,7 @@ startMoonbase
     >> runHooks HookAfterStartup
 
 stopMoonbase :: Moonbase ()
-stopMoonbase
-    = runHooks HookBeforeQuit
+stopMoonbase = runHooks HookBeforeQuit
     >> stopPanels
     >> stopServices 
     >> stopWindowManager 
@@ -123,13 +130,16 @@ stopMoonbase
     >> infoM "Stoping moonbase..."
 
 moonbase :: Config -> IO ()
-moonbase
-    conf = do
-            client <- startDbus
-            l <- openLog
+moonbase conf = do
+            setupHomeDirectory
+
+            client  <- startDbus
+            l       <- openLog
             runtime <- newRuntime client l
-            st <- atomically $ newTVar runtime
-            re <- runMoon conf st exec
+
+            st      <- atomically $ newTVar runtime
+
+            re      <- runMoon conf st exec
             case re of
                 Left err -> handleError err
                 Right _  -> putStrLn "Bye.."
