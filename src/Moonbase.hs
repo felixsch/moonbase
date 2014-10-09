@@ -11,7 +11,9 @@ module Moonbase
   , Name
   , Theme(..)
   , Config(..)
+  , Runtime(..)
   , Moonbase(..)
+  , io
   , moonbase
   , push
   , addHook
@@ -121,6 +123,7 @@ data Runtime = Runtime
     , config      :: Config
     , signals     :: TQueue MSignal
     , comps       :: M.Map Name Component
+    , preferred   :: M.Map String Preferred
     , cleanup     :: [Moonbase ()]
     , hooks       :: [Hook]
     }
@@ -131,6 +134,7 @@ newRuntime client conf sigs = Runtime
   , config      = conf
   , signals     = sigs 
   , comps       = M.empty
+  , preferred   = M.empty
   , cleanup     = []
   , hooks       = []
   }
@@ -169,6 +173,9 @@ instance MonadState Runtime Moonbase where
 
 evalMoonbase :: (TVar Runtime) -> Moonbase a -> IO a
 evalMoonbase ref (Moonbase a) = runReaderT a ref
+
+io :: IO a -> Moonbase a
+io = liftIO
 
 moonbase :: Config -> Moonbase () -> IO ()
 moonbase conf decl = do

@@ -51,18 +51,12 @@ cabal-version:       >=1.10
 
 library
   exposed-modules:    Moonbase
-                    , Moonbase.Core
                     , Moonbase.Log
-                    , Moonbase.Hook
                     , Moonbase.Panel
                     , Moonbase.Service
-                    , Moonbase.Service.Generic
                     , Moonbase.WindowManager
-                    , Moonbase.WindowManager.Generic
                     , Moonbase.Desktop
-                    , Moonbase.Desktop.Generic
                     , Moonbase.Preferred
-                    , Moonbase.Util.Trigger
                     , Moonbase.Util.Application
                     , Moonbase.Util.Process
 

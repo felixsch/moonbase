@@ -5,37 +5,19 @@ import qualified Data.Map as M
 
 import Moonbase
 import Moonbase.Preferred (app)
-import Moonbase.WindowManager.Generic
-import Moonbase.Service.Generic
-import Moonbase.Desktop.Generic
+import Moonbase.WindowManager
+import Moonbase.Service
+import Moonbase.Desktop
 
 
-openbox :: [String] -> WindowManager
-openbox = newGenericWM "openbox"
-
-xfcePanel :: Service
-xfcePanel = newGenericService "xfce4-panel" []
-
-samplePreferred :: M.Map String Preferred
-samplePreferred
+moPreferred :: M.Map String Preferred
+moPreferred
     = M.fromList
         [ ("image/png", app "gimp") ]
 
-setRoot :: String -> Desktop
-setRoot 
-    color = newGenericDesktop "xsetroot" ["-solid", color]
-
-
-defaultConfig :: Config 
-defaultConfig
-    = Config
-    { wm = openbox []
-    , autostart = [xfcePanel]
-    , preferred = samplePreferred
-    , desk   = setRoot "#ff0000"
-    , panels = []
-    , hooks = []
-    }
+moConfig :: Config
+moConfig = Config {}
 
 main :: IO ()
-main = moonbase defaultConfig
+main = moonbase moConfig $ do
+    return ()

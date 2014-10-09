@@ -10,8 +10,7 @@ import Control.Monad.Except
 import System.Process (spawnProcess, ProcessHandle)
 import System.Directory (findExecutable)
 
-import Moonbase.Core
-import Moonbase.Log
+import Moonbase
 
 
 
@@ -20,18 +19,15 @@ type Argument = String
 
 
 findApp :: (MonadIO m) => Application -> m (Maybe FilePath)
-findApp
-    app = io (findExecutable app)
+findApp app = liftIO $ findExecutable app
 
 
-spawn:: (Logger m, MonadIO m) =>  Application -> [Argument] -> m (Maybe ProcessHandle)
-spawn
-    app args = do
-        debugM $ " --: spawning " ++ app
+spawn :: (MonadIO m) =>  Application -> [Argument] -> m (Maybe ProcessHandle)
+spawn app args = do
         exec <- findApp app
         case exec of 
          Nothing -> return Nothing
          Just e -> do
-                    hdl <- io $ spawnProcess e args
+                    hdl <- liftIO $ spawnProcess e args
                     return $ Just hdl
 

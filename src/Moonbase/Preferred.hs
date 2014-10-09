@@ -3,6 +3,8 @@ module Moonbase.Preferred
     , app
     ) where 
 
+
+import Control.Monad.State
 import Control.Applicative
 
 import System.Directory
@@ -12,8 +14,7 @@ import System.Environment.XDG.BaseDir (getUserDataDir)
 import System.Environment.XDG.DesktopEntry (getName)
 import System.Environment.XDG.MimeApps
 
-import Moonbase.Core
-import Moonbase.Log
+import Moonbase
 
 
 app :: String -> Preferred
@@ -25,7 +26,7 @@ setPreferred
     where
         fromPreferred (AppName n) = n ++ ".desktop"
         fromPreferred (Entry e) = getName e ++ ".desktop"
-        update a = M.foldlWithKey updateMime a <$> (preferred <$> askConf)
+        update a = M.foldlWithKey updateMime a <$> (preferred <$> get)
         updateMime a m n = addDefault m (fromPreferred n) a
         set a = do
             dir <- io userMimeApps
@@ -49,10 +50,10 @@ loadMimeApps'
 
         if exists 
             then do
-                infoM "Loading mimeapps file..."
+                push (Info "Loading mimeapps file...")
                 io (loadMimeApps $ dir ++ "/applications/mimeapps.list")
             else
-                infoM "MimeApps doesn't exists: creating newone" >> return newMimeApps 
+                push (Info "MimeApps doesn't exists: creating newone") >> return newMimeApps 
 
 
 
