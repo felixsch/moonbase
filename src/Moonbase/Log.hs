@@ -5,10 +5,9 @@ module Moonbase.Log
     ) where
 
 import System.IO
-import System.Locale (defaultTimeLocale, rfc822DateFormat)
 
-import Data.Time.Format (formatTime)
-import Data.Time.LocalTime (getZonedTime)
+import Data.Time.Format
+import Data.Time.LocalTime
 
 import Control.Applicative 
 import Control.Monad.Reader
