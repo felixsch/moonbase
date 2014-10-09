@@ -4,7 +4,6 @@
 import qualified Data.Map as M
 
 import Moonbase
-import Moonbase.Core
 import Moonbase.Preferred (app)
 import Moonbase.WindowManager.Generic
 import Moonbase.Service.Generic
