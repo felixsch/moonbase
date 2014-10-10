@@ -1,6 +1,6 @@
 language: haskell
 before_install:
     - git clone https://github.com/felixsch/xdg.git
-    - cd xdg && cabal install
+    - cd xdg && cabal install && cd ..
 notifications:
     irc: "chat.freenode.net#felixsch"
