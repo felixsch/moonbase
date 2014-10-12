@@ -4,16 +4,14 @@
 import qualified Data.Map as M
 
 import Moonbase
-import Moonbase.Preferred (app)
-import Moonbase.WindowManager
 import Moonbase.Service
-import Moonbase.Desktop
+import Moonbase.Preferred (app)
 
 
 moPreferred :: M.Map String Preferred
 moPreferred
     = M.fromList
-        [ ("image/png", app "gimp") ]
+        [ app "image/png" "gimp" ]
 
 moConfig :: Config
 moConfig = Config {}

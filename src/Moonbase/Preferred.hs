@@ -3,10 +3,8 @@ module Moonbase.Preferred
     , app
     ) where 
 
-
-import Control.Monad.State
 import Control.Applicative
-
+import Control.Monad.State
 import System.Directory
 
 import qualified Data.Map as M
@@ -15,7 +13,6 @@ import System.Environment.XDG.DesktopEntry (getName)
 import System.Environment.XDG.MimeApps
 
 import Moonbase
-
 
 app :: String -> Preferred
 app = AppName
@@ -53,7 +50,8 @@ loadMimeApps'
                 push (Info "Loading mimeapps file...")
                 io (loadMimeApps $ dir ++ "/applications/mimeapps.list")
             else
-                push (Info "MimeApps doesn't exists: creating newone") >> return newMimeApps 
+                push (Info "MimeApps doesn't exists: creating newone")
+                >> return newMimeApps 
 
 
 

@@ -393,8 +393,19 @@ addDBusSignal match cmd = do
       evalMoonbase ref (cmd signal)
 
 
-data Preferred = Entry DesktopEntry
-               | AppName String
+data Application = AppEntry DesktopEntry
+                 | AppName  String
+
+class Executeable a where
+    getExecPath :: a -> Maybe String
+
+instance Executeable Application where
+    getExecPath (AppEntry entry) = getExec entry
+    getExecPath (AppName app)    = Just app
+
+data Preferred = forall a. (Executeable a) => Preferred Name a
+
+
 
 
 {-
