@@ -70,6 +70,9 @@ import qualified Data.Map as M
 import qualified Data.Sequence as S
 
 
+import Moonbase.Util.Application
+
+
 import DBus.Client
 import DBus
 
@@ -123,7 +126,7 @@ data Runtime = Runtime
     , config      :: Config
     , signals     :: TQueue MSignal
     , comps       :: M.Map Name Component
-    , preferred   :: M.Map String Preferred
+    , preferred   :: Maybe Preferred
     , cleanup     :: [Moonbase ()]
     , hooks       :: [Hook]
     }
@@ -134,7 +137,7 @@ newRuntime client conf sigs = Runtime
   , config      = conf
   , signals     = sigs 
   , comps       = M.empty
-  , preferred   = M.empty
+  , preferred   = Nothing
   , cleanup     = []
   , hooks       = []
   }
@@ -392,21 +395,9 @@ addDBusSignal match cmd = do
     liftIO $ addMatch (dbus rt) match $ \signal ->
       evalMoonbase ref (cmd signal)
 
+---- preferred ---------------------------------------------------------------------
 
-data Application = AppEntry DesktopEntry
-                 | AppName  String
-
-class Executeable a where
-    getExecPath :: a -> Maybe String
-
-instance Executeable Application where
-    getExecPath (AppEntry entry) = getExec entry
-    getExecPath (AppName app)    = Just app
-
-data Preferred = forall a. (Executeable a) => Preferred Name a
-
-
-
+data Preferred = forall a. (Executable a) => Preferred (M.Map String a)
 
 {-
 import Control.Applicative
