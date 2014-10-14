@@ -54,6 +54,7 @@ library
                     , Moonbase.Log
                     , Moonbase.Service
                     , Moonbase.Preferred
+                    , Moonbase.Item
                     , Moonbase.Util.Application
                     , Moonbase.Util.Process
 
