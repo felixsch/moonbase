@@ -1,3 +1,41 @@
+{-|
+Module      : Moonbase.Theme
+Copyright   : (c) Felix Schnizlein, 2014
+License     : GPL-2
+Maintainer  : felix@none.io
+Stability   : experimental
+Portability : POSIX
+
+To configure moonbase properly defining a basic theme is important. You can define your own theme or
+use theme which are allready defined by a maintainer for you.
+
+Example theme configuration:
+
+> droidSans = Font
+>   { fontName = "Droid Sans Mono"
+>   , fontSize = 12
+>   , fontAttr = [] }
+> 
+> myTheme = Theme
+>   { bg        = "#cccccc"
+>   , normal    = droidSans
+>   , normalC   = "#ffffff"
+>   , hl        = droidSans
+>   , hlC1      = "#1cff50"
+>   , hlA1      = [Bold]
+>   , hlC2      = magenta
+>   , hlA2      = []
+>   , disabledC = "#221312"
+>   , disabledA = [Italic] }
+>    
+> 
+> main :: IO ()
+> main = moonbase myConfig $ do
+>     setTheme myTheme
+>     ...
+> 
+-}
+
 module Moonbase.Theme
   ( Theme(..)
   , defaultTheme

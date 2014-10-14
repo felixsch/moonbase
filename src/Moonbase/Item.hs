@@ -1,3 +1,14 @@
+{-|
+Module      : Moonbase.Util.Application
+Copyright   : (c) Felix Schnizlein, 2014
+License     : GPL-2
+Maintainer  : felix@none.io
+Stability   : experimental
+Portability : POSIX
+
+Basic implementation of the @Item@ structure used by prompt and panel
+-}
+
 module Moonbase.Item
   ( Item(..)
   , Additional(..)

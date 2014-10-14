@@ -1,3 +1,25 @@
+{-|
+Module      : Moonbase.Util.Application
+Copyright   : (c) Felix Schnizlein, 2014
+License     : GPL-2
+Maintainer  : felix@none.io
+Stability   : experimental
+Portability : POSIX
+
+Implements the preferred mechanism of moonbase
+
+Example:
+
+> main :: IO ()
+> main = moonbase myConfig $ do
+>     setTheme myTheme
+>     withPreferred [ mimeImages              ==> app "gimp"
+>                   , mimeVideos <> mimeAudio ==> app "vlc"
+>                   , mimeSources <> mimeTxt  ==> terminal "vim" ]
+>     ...
+
+-}
+
 {-# LANGUAGE ExistentialQuantification #-}
 
 module Moonbase.Preferred
@@ -35,15 +57,19 @@ import qualified Data.Map as M
 import Moonbase
 import Moonbase.Util.Application
 
+-- | A list of mimetypes
 data Mimetypes = Mimetypes [String]
 
 instance Monoid Mimetypes where
     mempty = Mimetypes []
     mappend (Mimetypes a) (Mimetypes b) = Mimetypes $ a ++ b
 
+
+-- | Creates a Mimetypes with one element
 mime :: String -> Mimetypes
 mime t = Mimetypes [t]
 
+-- | Appends the preferred types to the moonbase configuration
 withPreferred :: forall a. (Executable a) => [(Mimetypes, a)] -> Moonbase ()
 withPreferred prefs = modify (\rt -> rt { preferred = value })
   where
@@ -51,23 +77,28 @@ withPreferred prefs = modify (\rt -> rt { preferred = value })
                  then Nothing
                  else (Just $ makePreferred prefs)
 
+-- | Generate a tuple of Mimetypes and a executable
 (==>) :: forall a. (Executable a) => Mimetypes -> a -> (Mimetypes, a)
 mime ==> exec = (mime, exec)
 
+-- | Synonym for Map.fromList for preferred 
 makePreferred :: forall a. (Executable a) => [(Mimetypes, a)] -> Preferred
 makePreferred prefs = Preferred $ genMap prefs M.empty
 
+-- | generates a Map.Map from a list of (mimetypes, executables) tuples
 genMap :: forall a. (Executable a) => [(Mimetypes, a)] -> M.Map String a -> M.Map String a
 genMap ((Mimetypes xt, exec) : xs) m = genMap xs $ addEachMime exec xt m
   where
       addEachMime exec (x:xs) m = addEachMime exec xs $ M.insert x exec m
 
+-- | get mimeapps files
 userMimeApps :: IO FilePath
 userMimeApps
     = do
         dir <- getUserDataDir
         return $ dir </> "applications" </> "mimeapps.list"
 
+-- | set preferred 
 setPreferred' :: Moonbase ()
 setPreferred' = do
     rt       <- get
@@ -103,7 +134,7 @@ setPreferred' = do
 
             return $ addDefault mime (execGetName exec <.> "desktop") mimeApps
 
-
+-- | load existing mimeApps file
 loadMimeApps' :: Moonbase MimeApps
 loadMimeApps' = do
     dir <- io getUserDataDir
@@ -118,6 +149,7 @@ loadMimeApps' = do
            else
            push (Info "MimeApps doesn't exists: creating newone")
            >> return newMimeApps  
+
 
 mimeImagePng = Mimetypes ["image/png"]
 mimeImageJpg = Mimetypes ["image/jpeg", "image/jpg", "image/pjpg"]

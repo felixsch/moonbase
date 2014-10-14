@@ -1,3 +1,12 @@
+{-|
+Module      : Moonbase
+Copyright   : (c) Felix Schnizlein, 2014
+License     : GPL-2
+Maintainer  : felix@none.io
+Stability   : experimental
+Portability : POSIX
+-}
+
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -267,7 +276,7 @@ openLog = do
  openFile (dir </> "moonbase" <.> "log") WriteMode
 
 
--- | Execute moonbase
+-- |Execute moonbase
 -- 
 -- This function is the core of every moonbase configuration.
 -- 
@@ -275,7 +284,7 @@ openLog = do
 -- components or hooks and ...
 --
 -- Basic example:
--- example
+--
 -- >   main :: IO
 -- >   main = moonbase defaultConfig $ do
 -- >     setTheme defaultTheme
@@ -289,6 +298,7 @@ openLog = do
 -- >        , followMouse = True }
 -- >     withBasicBackground defaultWallpaper
 -- >     atStartup $ firefox <> pulseaudio <> xcompmgr <> dFeet
+--
 moonbase :: Config -> Moonbase () -> IO ()
 moonbase conf decl = do
 
