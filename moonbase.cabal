@@ -51,7 +51,7 @@ cabal-version:       >=1.10
 
 library
   exposed-modules:    Moonbase
-                    , Moonbase.Log
+                    , Moonbase.Theme
                     , Moonbase.Service
                     , Moonbase.Preferred
                     , Moonbase.Item

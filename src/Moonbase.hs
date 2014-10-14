@@ -14,6 +14,8 @@ module Moonbase
   , Runtime(..)
   , Moonbase(..)
   , io
+  , getTheme
+  , getConfig
   , moonbase
   , push
   , addHook
@@ -31,6 +33,7 @@ module Moonbase
   , newComponent
   , newComponentWithCleanup
   , moon
+  , setTheme
   , withHook
   , warn
   , info
@@ -161,7 +164,8 @@ data Config  = Config
 -- 'Runtime' is used via a 'TVar' to gain thread safety
 data Runtime = Runtime 
     { dbus        :: Client                  -- ^ DBus client connection
-    , logHandle   :: Handle
+    , logHandle   :: Handle                  -- ^ Log file handle
+    , theme       :: Theme                   -- ^ moonbase theme
     , config      :: Config                  -- ^ Used configuration
     , signals     :: TQueue MSignal          -- ^ The signal queue
     , comps       :: M.Map Name Component    -- ^ Components listed by there name
@@ -175,6 +179,7 @@ newRuntime :: Client -> Handle -> Config -> TQueue MSignal -> Runtime
 newRuntime client hdl conf sigs = Runtime
   { dbus        = client
   , logHandle   = hdl
+  , theme       = defaultTheme
   , config      = conf
   , signals     = sigs 
   , comps       = M.empty
@@ -224,6 +229,14 @@ instance MonadState Runtime Moonbase where
 -- | runs a moonbase expression in 'IO'
 evalMoonbase :: (TVar Runtime) -> Moonbase a -> IO a
 evalMoonbase ref (Moonbase a) = runReaderT a ref
+
+-- | get current Theme
+getTheme :: Moonbase Theme
+getTheme = theme <$> get
+
+-- | get current Config
+getConfig :: Moonbase Config
+getConfig = config <$> get
 
 -- | lifts a 'IO' Action to 'Moonbase'
 io :: IO a -> Moonbase a
@@ -366,6 +379,9 @@ push signal = do
     runtime <- get
     liftIO $ atomically $ writeTQueue (signals runtime) signal
 
+-- | Sets the moonbase theme
+setTheme :: Theme -> Moonbase ()
+setTheme t = modify (\rt -> rt { theme = t })
 
 -- | Adds a hook to the runtime configuration
 addHook :: Name -> HookType -> Moonbase () -> Moonbase ()
