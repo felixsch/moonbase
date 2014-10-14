@@ -25,9 +25,13 @@ for Example:
 -}
 
 module Moonbase.Service
-    ( pulseaudio
+    ( Service
+    , run
+    , atStartup
+    , pulseaudio
     , setLanguage
     , setRootWindowColor
+    , autostart
     ) where
 
 import Control.Monad
