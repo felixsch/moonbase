@@ -11,6 +11,7 @@ Portability : POSIX
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ExistentialQuantification #-}
 
 module Moonbase 
@@ -21,6 +22,8 @@ module Moonbase
   , Theme(..)
   , Config(..)
   , Runtime(..)
+  , TVar(..)
+  , atomically
   , Moonbase(..)
   , io
   , getTheme
@@ -477,6 +480,14 @@ instance Applicative (ComponentM st) where
 instance (Monoid a) => Monoid (ComponentM st a) where
     mempty = return mempty
     mappend = liftM2 mappend
+
+instance MonadState st (ComponentM st) where
+    get = do
+        (_, ref) <- ask
+        liftIO $ readTVarIO ref
+    put sta = do
+        (_, ref) <- ask
+        liftIO $ atomically $ writeTVar ref sta
 
 -- | Evaluates a component expression 
 evalComponentM :: Name -> TVar st -> ComponentM st a -> Moonbase a
