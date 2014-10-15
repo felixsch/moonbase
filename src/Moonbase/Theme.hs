@@ -40,6 +40,7 @@ module Moonbase.Theme
   ( Theme(..)
   , defaultTheme
   , Color
+  , color_
   , FontAttribute(..)
   , Font(..)
   , bold
@@ -54,11 +55,27 @@ module Moonbase.Theme
   , purple, teal, navy
   ) where
 
+import Control.Applicative
+
+import Data.Char
 
 import {-# SOURCE #-} Moonbase
 
 -- | Color defined as html heximal color string (eg. "#fafa21")
 type Color = String
+
+-- | Simple check if the color is correct
+color_ :: Color -> Color
+color_ ['#', r, g, b]                = ['#', r, r, g, g, b, b]
+color_ ['#', r1, r2, g1, g2, b1, b2] = case checkHex [r1, r2, g1, g2, b1, b2] of
+                                            Just x  -> '#' : x
+                                            Nothing -> magenta
+color_ _                             = magenta
+
+checkHex :: String -> Maybe String
+checkHex (x:xs) = if isHexDigit x
+                     then (x :) <$> checkHex xs
+                     else Nothing
 
 -- | Font attributes
 data FontAttribute = Bold      -- ^ Draw the font bold

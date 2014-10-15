@@ -15,8 +15,10 @@ moConfig = Config
 
 main :: IO ()
 main = moonbase moConfig $ do
-    withPreferred $ [ mimeImages ==> app "gimp" ]
     setTheme defaultTheme
+    withPreferred $ [ mimeImages ==> app "gimp" ]
+    atStartup $ setRootWindowColor
+
 
 
     

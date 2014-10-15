@@ -30,15 +30,37 @@ module Moonbase.Preferred
     , (==>)
     , makePreferred
     , userMimeApps
-    , mimeImagePng
-    , mimeImageJpg
-    , mimeImageSvg
-    , mimeImages
     , Application(..)
     , app
     , appWith
+    
+    , mimeImage
+    , mimeImageTypes
+    , mimeImages
+
+    , mimeAudio
+    , mimeAudioTypes
+    , mimeAudios
+
+    , mimeVideo
+    , mimeVideoTypes
+    , mimeVideos
+    
+    , mimeSource
+    , mimeSourceTypes
+    , mimeSources
+
+    , mimeTextHtml
+    , mimeTextXml
+    , mimeTextTxt
+
+    , mimeArchives 
+    , mimePdf
+    , mimeTorrent
+    , mimeOpenDocuments
     ) where 
 
+import Prelude hiding (foldl)
 import Control.Applicative
 import Control.Monad.State
 
@@ -150,56 +172,91 @@ loadMimeApps' = do
            push (Info "MimeApps doesn't exists: creating newone")
            >> return newMimeApps  
 
+-- | Create a new image/* mimetype
+mimeImage :: String -> Mimetypes
+mimeImage image = Mimetypes ["image/" ++ image]
 
-mimeImagePng = Mimetypes ["image/png"]
-mimeImageJpg = Mimetypes ["image/jpeg", "image/jpg", "image/pjpg"]
-mimeImageSvg = Mimetypes ["image/svg+xml"]
+-- | Common image mime names
+mimeImageTypes :: [String]
+mimeImageTypes = [ "png", "jpeg", "jpg", "pjpg", "svg+xml", "x-freehand", "x-icon"
+                 , "x-pcx", "x-rgb", "x-tga", "x-xbitmap", "x-xpixmap"
+                 , "vnd.adobe.photoshop", "tiff", "gif", "bmp" ]
 
-mimeImages = mimeImagePng <> mimeImageJpg <> mimeImageSvg
-
-
-mimeVideoMkv  = Mimetypes ["video/x-matroska"]
-mimeVideoAvi  = Mimetypes ["video/x-msvideo"]
-mimeVideoWebm = Mimetypes ["video/webm"]
-mimeVideoMp4  = Mimetypes ["video/mp4"]
-mimeVideoMpeg = Mimetypes ["video/mpeg"]
-mimeVideoOgv  = Mimetypes ["video/ogg"]
-mimeVideoH264 = Mimetypes ["video/h264"]
-
-mimeVideos = mimeVideoMkv <> mimeVideoAvi <> mimeVideoWebm <> mimeVideoMp4 <>
-             mimeVideoMpeg <> mimeVideoOgv <> mimeVideoH264
+-- | Common image types
+mimeImages :: Mimetypes
+mimeImages = foldl (\m i -> m <> mimeImage i) (Mimetypes []) mimeImageTypes
 
 
-mimeTextC = Mimetypes ["text/x-c"]
-mimeTextAsm = Mimetypes ["text/x-asm"]
-mimeTextJava = Mimetypes ["text/x-java-source"]
-mimeTextJavascript = Mimetypes ["text/javascript"]
-mimeTextSh         = Mimetypes ["application/x-sh"]
+-- | Create a new video/* mimetype
+mimeVideo :: String -> Mimetypes
+mimeVideo video = Mimetypes ["video/" ++ video]
+
+-- | Common video mime names
+mimeVideoTypes :: [String]
+mimeVideoTypes = [ "x-matroska", "x-msvideo", "webm", "mp4", "mpeg", "ogg", "h264"
+                 , "x-flv", "quicktime"]
+
+-- | Common video types
+mimeVideos :: Mimetypes
+mimeVideos = foldl (\m v -> m <> mimeVideo v) (Mimetypes []) mimeVideoTypes
+
+-- | Create a new audio/* mimetype
+mimeAudio :: String -> Mimetypes
+mimeAudio audio = Mimetypes ["audio/" ++ audio]
+
+-- | Common audio mime names
+mimeAudioTypes = [ "x-wav", "x-ms-wma", "x-mpegurl", "x-flac", "webm", "ogg"
+                 , "mpeg", "mp4", "midi" ]
+
+-- | Common audio mime types
+mimeAudios :: Mimetypes
+mimeAudios = foldl (\m v -> m <> mimeAudio v) (Mimetypes []) mimeAudioTypes
+
+-- | Create a new text/* mimetype
+mimeSource :: String -> Mimetypes
+mimeSource text = Mimetypes ["text/" ++ text]
+
+-- | Some source code names (including "plain")
+mimeSourceTypes :: [String]
+mimeSourceTypes = [ "x-c", "x-asm", "x-java-source" , "plain", "x-pascal", "html" ]
+
+-- | Some source code mimetypes
+mimeSources :: Mimetypes
+mimeSources = foldl (\m v -> m <> mimeSource v) (Mimetypes []) mimeSourceTypes
 
 
+-- | Text mimetype
+mimeTextTxt :: Mimetypes
+mimeTextTxt  = Mimetypes ["text/plain"]
 
-mimeTextTxt = Mimetypes ["text/plain"]
-
-
+-- | Html mimetype
+mimeTextHtml :: Mimetypes
 mimeTextHtml = Mimetypes ["text/html"]
+
+-- | Xml mimetype
+mimeTextXml :: Mimetypes
 mimeTextXml  = Mimetypes ["application/xml"]
 
+-- | Common archive mimetypes
+mimeArchives :: Mimetypes
+mimeArchives = Mimetypes [ "application/x-gzip", "application/zip", 
+                           "application/x-xz", "application/x-tar",
+                           "application/x-rar-compressed",
+                           "application/x-debian-package",
+                           "application/x-cpio", "application/x-bzip",
+                           "application/x-bzip2",
+                           "application/vnd.android.package-archive" ]
 
-
-mimeArchiveGz = Mimetypes ["application/x-gzip"]
-mimeArchiveZip = Mimetypes ["application/zip"]
-mimeArchiveXz  = Mimetypes ["application/x-xz"]
-mimeArchiveTar = Mimetypes ["application/x-tar"]
-mimeArchiveRar = Mimetypes ["application/x-rar-compressed"]
-mimeArchiveDeb = Mimetypes ["application/x-debian-package"]
-mimeArchiveCpiio = Mimetypes ["application/x-cpio"]
-mimeArchiveBzip  = Mimetypes ["application/x-bzip", "application/x-bzip2"]
-mimeArchiveApk   = Mimetypes ["application/vnd.android.package-archive"]
-
+-- | Pdf mimetype
+mimePdf :: Mimetypes
 mimePdf = Mimetypes ["application/pdf"]
 
+-- | Torrent mimetype
+mimeTorrent :: Mimetypes
 mimeTorrent = Mimetypes ["application/x-bittorrent"]
 
+-- | All OpenDocuments mimetypes
+mimeOpenDocuments :: Mimetypes
 mimeOpenDocuments = Mimetypes [ "application/vnd.oasis.opendocument.chart"
                               , "application/vnd.oasis.opendocument.chart-template"
                               , "application/vnd.oasis.opendocument.database"
