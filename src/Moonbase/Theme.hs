@@ -39,7 +39,7 @@ Example theme configuration:
 module Moonbase.Theme
   ( Theme(..)
   , defaultTheme
-  , Color
+  , Color(..)
   , color_
   , FontAttribute(..)
   , Font(..)
@@ -118,6 +118,8 @@ data Theme = Theme
   , hlA1      :: [FontAttribute]   -- ^ First Highlight attributes
   , hlC2      :: Color             -- ^ Second Highlight color
   , hlA2      :: [FontAttribute]   -- ^ Second hightlight attributes
+  , active    :: Font              -- ^ Font of active elements
+  , activeC   :: Color             -- ^ Color of inactive elements
   , disabledC :: Color             -- ^ Color of disabled items
   , disabledA :: [FontAttribute]   -- ^ Attributes of disabled items
   }
@@ -134,9 +136,11 @@ defaultMonospace = Font "Monospace" 12 []
 -- | Moonbase default theme
 defaultTheme :: Theme
 defaultTheme = Theme
-  { bg        = black
+  { bg        = "#242424"
   , normal    = defaultSans
   , normalC   = white
+  , active    = defaultSans
+  , activeC   = "#9ec400"
   , hl        = defaultSans
   , hlC1      = lime
   , hlA1      = [Bold]

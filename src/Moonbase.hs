@@ -251,7 +251,7 @@ getConfig :: Moonbase Config
 getConfig = config <$> get
 
 -- | lifts a 'IO' Action to 'Moonbase'
-io :: IO a -> Moonbase a
+io :: (MonadIO m) => IO a -> m a
 io = liftIO
 
 
@@ -354,7 +354,12 @@ startMoonbase = do
 
 -- | Export basic DBus functionality
 exportCoreDBus :: Moonbase ()
-exportCoreDBus = return ()
+exportCoreDBus = do
+    addDBusMethod $ \ref -> 
+      autoMethod moonInterface "Quit" (wrap0 ref signalQuit)
+
+  where
+      signalQuit = push Shutdown
 
 -- | Start components if they not allready started
 startComponents :: Moonbase ()
