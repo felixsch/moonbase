@@ -16,6 +16,7 @@ Portability : POSIX
 
 module Moonbase 
   ( MSignal(..)
+  , MonadSignal(..)
   , isFatal
 
   , Name
@@ -161,6 +162,10 @@ isShutdown :: MSignal -> Bool
 isShutdown Shutdown = True
 isShutdown _        = False
 
+-- | Add a MonadSignal instance if you want to push signals
+class MonadSignal m where
+    push :: MSignal -> m () -- ^ push a Signal to the signal queue
+
 
 -- | Component Indentifier
 type Name = String
@@ -237,6 +242,11 @@ instance MonadState Runtime Moonbase where
     put sta = do
         ref <- ask
         liftIO $ atomically $ writeTVar ref sta
+
+instance MonadSignal Moonbase where
+    push signal = do
+        runtime <- get
+        liftIO $ atomically $ writeTQueue (signals runtime) signal
 
 -- | runs a moonbase expression in 'IO'
 evalMoonbase :: (TVar Runtime) -> Moonbase a -> IO a
@@ -383,20 +393,6 @@ stopMoonbase = do
     runHooks HookExit
     push Exit
 
--- | push a signal to signal queue
---
--- for example:
---
--- > sample :: Moonbase ()
--- > sample = do
--- >      push (Info "some sample")
--- >      ...
--- >      push (Info "done")
-push :: MSignal -> Moonbase ()
-push signal = do
-    runtime <- get
-    liftIO $ atomically $ writeTQueue (signals runtime) signal
-
 -- | Sets the moonbase theme
 setTheme :: Theme -> Moonbase ()
 setTheme t = modify (\rt -> rt { theme = t })
@@ -493,6 +489,9 @@ instance MonadState st (ComponentM st) where
     put sta = do
         (_, ref) <- ask
         liftIO $ atomically $ writeTVar ref sta
+
+instance MonadSignal (ComponentM st) where
+    push signal = moon $ push signal
 
 -- | Evaluates a component expression 
 evalComponentM :: Name -> TVar st -> ComponentM st a -> Moonbase a
