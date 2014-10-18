@@ -30,8 +30,8 @@ module Moonbase
   , getTheme
   , getConfig
   , moonbase
-  , push
   , addHook
+  , addHooks
   , addCleanup
   , withComponent
   , getComponent
@@ -48,6 +48,7 @@ module Moonbase
   , moon
   , setTheme
   , withHook
+  , withHooks
   , warn
   , info
   , initFailed
@@ -399,9 +400,11 @@ setTheme t = modify (\rt -> rt { theme = t })
 
 -- | Adds a hook to the runtime configuration
 addHook :: Name -> HookType -> Moonbase () -> Moonbase ()
-addHook name typ f = modify (\rt -> rt { hooks = new : (hooks rt)})
-  where
-      new = Hook name typ f
+addHook name typ f = addHooks [Hook name typ f]
+
+-- | Add hooks to runtime configuration
+addHooks :: [Hook] -> Moonbase ()
+addHooks hs = modify (\rt -> rt { hooks = hs ++ (hooks rt)})
 
 -- | Adds a cleanup method to runtime configuration
 -- 
@@ -519,6 +522,10 @@ moon = ComponentM . lift
 -- | Adds a hook to moonbase runtime configuration
 withHook :: Name -> HookType -> Moonbase () -> ComponentM st ()
 withHook name typ f = moon $ addHook name typ f
+
+withHooks :: [Hook] -> ComponentM st ()
+withHooks = moon . addHooks
+
 
 -- | Signals a warning
 warn :: String -> ComponentM st ()
