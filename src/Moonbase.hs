@@ -33,9 +33,9 @@ module Moonbase
   , addHook
   , addHooks
   , addCleanup
+  , Priority(..)
   , withComponent
   , getComponent
-  , modifyComponent
   
   , HookType(..)
   , Hook(..)
@@ -89,12 +89,15 @@ import Control.Concurrent
 
 import Data.Maybe
 import Data.Monoid
+import Data.List
+import qualified Data.Foldable as Fold
 import qualified Data.Map as M
 import qualified Data.Sequence as S
 
 
 import Moonbase.Theme
 import Moonbase.Util.Application
+import Moonbase.Util.Process
 
 
 import DBus.Client
@@ -186,7 +189,7 @@ data Runtime = Runtime
     , theme       :: Theme                   -- ^ moonbase theme
     , config      :: Config                  -- ^ Used configuration
     , signals     :: TQueue MSignal          -- ^ The signal queue
-    , comps       :: M.Map Name Component    -- ^ Components listed by there name
+    , comps       :: S.Seq (Priority, Name, Component)    -- ^ Components listed by there name
     , preferred   :: Maybe Preferred         -- ^ All preferred applications by mime
     , cleanup     :: [Moonbase ()]           -- ^ Cleanup methods which are called before exit.
     , hooks       :: [Hook]                  -- ^ Hooks which are injected at some points
@@ -200,7 +203,7 @@ newRuntime client hdl conf sigs = Runtime
   , theme       = defaultTheme
   , config      = conf
   , signals     = sigs 
-  , comps       = M.empty
+  , comps       = S.empty
   , preferred   = Nothing
   , cleanup     = []
   , hooks       = []
@@ -359,7 +362,8 @@ startMoonbase :: Moonbase ()
 startMoonbase = do
     push (Info "Starting moonbase")
     exportCoreDBus
-    runHooks HookStart
+    rt <- get
+    runHooks HookInit
     startComponents
     runHooks HookAfterStartup
 
@@ -376,15 +380,25 @@ exportCoreDBus = do
 startComponents :: Moonbase ()
 startComponents = do
     rt <- get
-    forMapM_ (comps rt) $ \k (Component init' mRef f _) ->
-        case mRef of
-             Just ref -> push (Warning $ "Component " ++ k ++ " is allready started")
-             Nothing  -> do
-                 push (Info $ "Starting " ++ k ++ "...")
-                 ref <- liftIO $ atomically $ newTVar init'
-                 evalComponentM k ref f              
+    push (Info $ "All components: " ++ intercalate ", " (Fold.foldl (\l (_, n, _) -> n : l) []  $ comps rt))
+    push (Info $ "Starting components...")
+
+    runComponents (byPriority High $ comps rt)
+
+    push (Info $ "run HookStart...")
+    runHooks HookStart
+
+    push (Info $ "Starting components priority low...")
+    runComponents (byPriority Low  $ comps rt)
+
     where
-        forMapM_ map f = M.foldlWithKey (\_ k x -> f k x) (return ()) map
+        runComponents comps = Fold.forM_ comps $ \(_, k, (Component init' mRef f _)) ->
+            case mRef of
+                Just ref -> push (Warning $ "Component " ++ k ++ " is allready started")
+                Nothing  -> do
+                    push (Info $ "Starting " ++ k ++ "...")
+                    ref <- liftIO $ atomically $ newTVar init'
+                    void $ evalComponentM k ref f
 
 -- | Run cleanup and exit hooks
 stopMoonbase :: Moonbase ()
@@ -413,35 +427,50 @@ addHooks hs = modify (\rt -> rt { hooks = hs ++ (hooks rt)})
 addCleanup :: Moonbase () -> Moonbase ()
 addCleanup cl = modify (\rt -> rt { cleanup = cl : (cleanup rt)})
 
+
+byName :: Name -> S.Seq (Priority, Name, Component) -> S.Seq (Priority, Name, Component)
+byName name s = S.filter isName s
+  where
+      isName (_, n, _) 
+       | n == name  = True
+       | otherwise  = False
+
+byPriority :: Priority -> S.Seq (Priority, Name, Component) -> S.Seq (Priority, Name, Component)
+byPriority prior s = S.filter isPriority s
+  where
+      isPriority (p, _, _) 
+       | p == prior  = True
+       | otherwise   = False
+
+
+nameExists :: Name -> S.Seq (Priority, Name, Component) -> Bool
+nameExists name s = 0 < S.length (byName name s)
+
+data Priority = High
+              | Low 
+              deriving (Show, Eq)
+
 -- | Register a component to moonbase runtime configuration
-withComponent :: Name -> Component -> Moonbase ()
-withComponent name comp = modify (\rt -> rt { comps = M.insert name comp (comps rt)})
+withComponent :: Priority -> Name -> Component -> Moonbase ()
+withComponent High name comp = modify (\rt -> rt { comps = (High, name,comp) S.<| (comps rt)})
+withComponent Low  name comp = modify (\rt -> rt { comps = (comps rt) S.|> (Low,name,comp)})
 
 -- | Get a component by name
-getComponent :: Name -> Moonbase (Maybe Component)
-getComponent n = M.lookup n . comps <$> get
-
--- | Modify a component
---
--- If the component is not found nothing is executed
-modifyComponent :: Name -> (Component -> Component) -> Moonbase ()
-modifyComponent n f = do
-    mComp <- getComponent n
-    case mComp of
-         Nothing -> return ()
-         Just c  -> withComponent n (f c)
+getComponent :: Name -> Moonbase [Component]
+getComponent n = Fold.foldl (\l (_,_, c) -> c : l) [] . byName n . comps <$> get
 
 
 runCleanup :: Moonbase ()
 runCleanup = do
     rt <- get
-    sequence_ $ (cleanup rt) ++ M.foldlWithKey runCF [] (comps rt) 
+    sequence_ $ (cleanup rt) ++ Fold.foldl runCF [] (comps rt) 
  where
-     runCF xs k (Component _ (Just ref) _ c) = evalComponentM k ref c : xs
-     runCF _  _ _                          = return $ return ()
+     runCF xs (_, k,(Component _ (Just ref) _ c)) = evalComponentM k ref c : xs
+     runCF _  _                                = return $ return ()
 
 -- | Specify at which state of execution a hook should be executed
-data HookType = HookStart        -- ^ before moonbase starts
+data HookType = HookInit         -- ^ before initalize components
+              | HookStart        -- ^ before moonbase starts
               | HookAfterStartup -- ^ after moonbase has started
               | HookExit         -- ^ after cleanup
               deriving(Show, Eq)
@@ -449,12 +478,15 @@ data HookType = HookStart        -- ^ before moonbase starts
 -- | A function which is executed by moonbase at the right time
 data Hook = Hook Name HookType (Moonbase ())
 
+instance Eq Hook where
+    (Hook aName aType _) == (Hook bName bType _) = aName == bName && aType == bType
+
 -- | Helper function to generate a new Hook
 makeHook :: Name -> HookType -> Moonbase () -> Hook
 makeHook = Hook
 
 runHooks :: HookType -> Moonbase ()
-runHooks typ = mapM_ start =<< (filter (byType typ) . hooks <$> get)
+runHooks typ = mapM_ start =<< (filter (byType typ) . nub . hooks <$> get)
     where
         byType a (Hook _ b _ ) = a == b
         start (Hook a ty call) = do

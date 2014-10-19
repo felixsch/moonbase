@@ -39,6 +39,7 @@ import Data.Maybe
 
 
 import Moonbase
+import Moonbase.Theme (color_)
 import Moonbase.Item
 import Moonbase.Util.Application
 
@@ -52,7 +53,7 @@ run (Item services) = sequence_ services
 
 -- | Configure services which should run at startup
 atStartup :: Service -> Moonbase ()
-atStartup (Item services) = withComponent "startup" $ newComponent services $ 
+atStartup (Item services) = withComponent Low "startup" $ newComponent services $ 
     mapM_ moon services
 
 -- | Start pulseaudio if not started
@@ -70,7 +71,7 @@ setLanguage lang variant = item $ void $ spawn $ appWith "setxkbmap" (lang : arg
 setRootWindowColor :: Service
 setRootWindowColor = item $ do
     theme <- getTheme
-    void $ spawn $ appWith "xsetroot" ["-solid", bg theme]
+    void $ spawn $ appWith "xsetroot" ["-solid", color_ (bg theme)]
 
 -- | Autostart some applications
 autostart :: [Application] -> Service

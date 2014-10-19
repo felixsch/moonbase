@@ -73,6 +73,7 @@ color_ ['#', r1, r2, g1, g2, b1, b2] = case checkHex [r1, r2, g1, g2, b1, b2] of
 color_ _                             = magenta
 
 checkHex :: String -> Maybe String
+checkHex []     = Just []
 checkHex (x:xs) = if isHexDigit x
                      then (x :) <$> checkHex xs
                      else Nothing
