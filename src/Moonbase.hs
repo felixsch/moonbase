@@ -54,7 +54,10 @@ module Moonbase
   , initFailed
 
   , moonBusName
+  , withInterface
   , moonInterface
+  , moonObjectPath
+  , withObjectPath
   , addDBusMethod
   , wrap0
   , wrap1
@@ -370,8 +373,8 @@ startMoonbase = do
 -- | Export basic DBus functionality
 exportCoreDBus :: Moonbase ()
 exportCoreDBus = do
-    addDBusMethod $ \ref -> 
-      autoMethod moonInterface "Quit" (wrap0 ref signalQuit)
+    addDBusMethod moonObjectPath $ \ref -> [
+      autoMethod moonInterface "Quit" (wrap0 ref signalQuit) ]
 
   where
       signalQuit = push Shutdown
@@ -588,6 +591,15 @@ moonBusName = "org.moonbase"
 moonInterface :: InterfaceName
 moonInterface = "org.moonbase"
 
+withInterface :: String -> InterfaceName
+withInterface name = interfaceName_ $ (formatInterfaceName moonInterface) ++ "." ++ name
+
+moonObjectPath :: ObjectPath
+moonObjectPath = "/org/moonbase"
+
+withObjectPath :: String -> ObjectPath
+withObjectPath name = objectPath_ $ (formatObjectPath moonObjectPath) ++ "/" ++ name
+
 startDBus :: IO Client
 startDBus = do
         client <- connectSession
@@ -611,11 +623,11 @@ startDBus = do
 --
 -- Use wrap0/1/2/3 to wrap methods with x arguments 
 --
-addDBusMethod :: ((TVar Runtime) -> Method)  -> Moonbase ()
-addDBusMethod gen = do
+addDBusMethod :: ObjectPath -> ((TVar Runtime) -> [Method])  -> Moonbase ()
+addDBusMethod objPath gen = do
     rt <- get  
     ref <- ask
-    liftIO $ export (dbus rt) "/" [ gen ref ]
+    liftIO $ export (dbus rt) objPath $ gen ref
 
 -- | Wraps a 'Moonbase b' to a 'IO' action
 wrap0 :: (TVar Runtime) -> Moonbase b -> IO b
