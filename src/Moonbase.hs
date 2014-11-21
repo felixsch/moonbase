@@ -71,6 +71,7 @@ module Moonbase
 import System.IO
 import System.Directory
 import System.FilePath.Posix
+import System.Locale
 import Data.Time.Format
 import Data.Time.LocalTime
 import System.Environment
