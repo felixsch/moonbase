@@ -10,6 +10,7 @@ Portability : POSIX
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ExistentialQuantification #-}
@@ -229,9 +230,10 @@ instance MonadBase IO Moonbase where
     liftBase = Moonbase . lift
 
 instance MonadBaseControl IO Moonbase where
-    newtype StM Moonbase a = StMoonbase { unStMoonbase :: StM (ReaderT (TVar Runtime) IO) a }
-    liftBaseWith f = Moonbase (liftBaseWith (\runIO -> f (fmap StMoonbase . runIO . runMoonbase)))
-    restoreM = Moonbase . restoreM . unStMoonbase
+    type StM Moonbase a = StM (ReaderT (TVar Runtime) IO) a
+    liftBaseWith f = Moonbase . liftBaseWith $ \runIO -> 
+      f $ runIO . runMoonbase
+    restoreM = Moonbase . restoreM
 
 instance Applicative Moonbase where
     pure  = return
