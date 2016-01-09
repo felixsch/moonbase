@@ -3,7 +3,7 @@ version:             0.1.0.0
 synopsis:            Desktop environment in a haskell file
 description:         Please see README.md
 homepage:            http://github.com/felixsch/moonbase
-license:             GPL3
+license:             GPL-3
 license-file:        LICENSE
 author:              Felix Schnizlein
 maintainer:          felix@schnizle.in
@@ -58,7 +58,7 @@ test-suite hspec
   ghc-options:         -fhpc -threaded -rtsopts -with-rtsopts=-N
   default-language:    Haskell2010
   other-modules:       Moonbase.CoreSpec
-  
+
 source-repository head
   type:     git
   location: https://github.com/felixsch/moonbase
