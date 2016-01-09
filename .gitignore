@@ -1,5 +1,0 @@
-dist
-dist/*
-cabal.sandbox.config
-.cabal-sandbox
-.cabal-sandbox/*
