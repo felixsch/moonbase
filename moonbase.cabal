@@ -1,14 +1,14 @@
 name:                moonbase
 version:             0.1.0.0
-synopsis:            Initial project template from stack
+synopsis:            Desktop environment in a haskell file
 description:         Please see README.md
-homepage:            http://github.com/githubuser/moonbase#readme
-license:             BSD3
+homepage:            http://github.com/felixsch/moonbase
+license:             GPL3
 license-file:        LICENSE
-author:              Author name here
-maintainer:          example@example.com
-copyright:           2010 Author Here
-category:            Web
+author:              Felix Schnizlein
+maintainer:          felix@schnizle.in
+copyright:           2016 Felix Schnizlein
+category:            System
 build-type:          Simple
 -- extra-source-files:
 cabal-version:       >=1.10
@@ -61,4 +61,4 @@ test-suite hspec
   
 source-repository head
   type:     git
-  location: https://github.com/moonbasede/moonbase
+  location: https://github.com/felixsch/moonbase
