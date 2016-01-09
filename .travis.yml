@@ -4,7 +4,9 @@ sudo: false
 env: CABALVER=1.22 GHCVER=7.10.3
 addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.3],sources: [hvr-ghc]}}
 
-
+cache:
+  directories:
+    - $HOME/.cabal
 
 before_install:
   - export PATH=/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:$PATH
@@ -13,7 +15,8 @@ install:
  - cabal --version
  - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
  - travis_retry cabal update
- - cabal install --only-dependencies --enable-tests
+ - cabal install --only-dependencies --enable-tests 
+ - cabal install hpc-coveralls
 
 script:
  - cabal configure --enable-tests --enable-coverage
@@ -21,7 +24,6 @@ script:
  - cabal test --show-details=always
 
 after_script:
- - cabal install hpc-coveralls
  - export PATH=~/.cabal/bin:$PATH
  - hpc-coveralls --coverage-mode=StrictlyFullLines
                  --exclude-dir=test
