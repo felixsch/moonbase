@@ -1,0 +1,64 @@
+name:                moonbase
+version:             0.1.0.0
+synopsis:            Initial project template from stack
+description:         Please see README.md
+homepage:            http://github.com/githubuser/moonbase#readme
+license:             BSD3
+license-file:        LICENSE
+author:              Author name here
+maintainer:          example@example.com
+copyright:           2010 Author Here
+category:            Web
+build-type:          Simple
+-- extra-source-files:
+cabal-version:       >=1.10
+
+library
+  hs-source-dirs:      src
+  exposed-modules:     Moonbase
+                     , Moonbase.Core
+                     , Moonbase.Cli
+                     , Moonbase.DBus
+                     , Moonbase.Theme
+
+  default-language:    Haskell2010
+  build-depends:       base >= 4.7 && < 5
+         , lens
+         , text
+         , containers
+         , transformers
+         , mtl
+         , stm
+         , directory
+         , filepath
+         , time
+         , process
+         , dyre
+         , dbus
+         , optparse-applicative
+
+executable moonbase
+  hs-source-dirs:      src
+  main-is:             Main.hs
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  build-depends:       base
+                     , moonbase
+  default-language:    Haskell2010
+
+test-suite hspec
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      test src
+  main-is:             HSpec.hs
+  build-depends:       base
+                     , hspec
+                     , HUnit
+                     , QuickCheck
+                     , moonbase
+
+  ghc-options:         -fhpc -threaded -rtsopts -with-rtsopts=-N
+  default-language:    Haskell2010
+  other-modules:       Moonbase.CoreSpec
+  
+source-repository head
+  type:     git
+  location: https://github.com/moonbasede/moonbase

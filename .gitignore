@@ -1,0 +1,8 @@
+dist
+dist/*
+cabal.sandbox.config
+.cabal-sandbox
+.cabal-sandbox/*
+.hpc
+hspec.tix
+.stack-work
