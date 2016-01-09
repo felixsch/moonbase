@@ -47,7 +47,7 @@ executable moonbase
 
 test-suite hspec
   type:                exitcode-stdio-1.0
-  hs-source-dirs:      test src
+  hs-source-dirs:      test
   main-is:             HSpec.hs
   build-depends:       base
                      , hspec
@@ -55,7 +55,7 @@ test-suite hspec
                      , QuickCheck
                      , moonbase
 
-  ghc-options:         -fhpc -threaded -rtsopts -with-rtsopts=-N
+  ghc-options:         -fhpc -threaded
   default-language:    Haskell2010
   other-modules:       Moonbase.CoreSpec
                      , Moonbase.ThemeSpec

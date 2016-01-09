@@ -21,8 +21,10 @@ install:
   - stack setup --no-terminal
 
 script:
-  - stack test --no-terminal --coverage
+  - stack build --no-terminal
+  - cabal configure --enable-tests --enable-coverage
+  - cabal test
 
 after_script:
-  - travis_retry curl -L https://github.com/rubik/stack-hpc-coveralls/releases/download/v0.0.2.0/shc-linux-x64-$GHCVER.tar.bz2 | tar -xj
-  - ./shc moonbase test
+  - cabal install hpc-coveralls
+  - hpc-coveralls hspec

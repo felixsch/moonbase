@@ -3,6 +3,7 @@ module Moonbase.CoreSpec where
 import           Test.Fake
 import           Test.Hspec
 
+import Moonbase.Core
 
 spec :: Spec
 spec = do

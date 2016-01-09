@@ -3,13 +3,20 @@ module Moonbase.ThemeSpec where
 import           Test.Fake
 import           Test.Hspec
 
+import           Moonbase.Theme
+
+test_bold :: SpecWith ()
+test_bold = describe "#bold" $
+  it "marks a font as bold" $
+    fontAttrs (bold sample) `shouldBe` [Bold]
+  where
+    sample = monospace
+
 
 spec :: Spec
 spec = do
+  test_bold
   describe "color_" $
-    it "test implementation" $
-      pending
-  describe "bold" $
     it "test implementation" $
       pending
   describe "italic" $
