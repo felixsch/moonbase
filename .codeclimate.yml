@@ -1,6 +1,9 @@
 engines:
+  fixme:
+    enabled: true
   hlint:
     enabled: true
-  ratings:
-    paths:
-    - "src/**.hs"
+
+ratings:
+  paths:
+  - "**.hs"
