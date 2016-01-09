@@ -54,8 +54,7 @@ test-suite hspec
                      , HUnit
                      , QuickCheck
                      , moonbase
-
-  ghc-options:         -fhpc -threaded
+                     
   default-language:    Haskell2010
   other-modules:       Moonbase.CoreSpec
                      , Moonbase.ThemeSpec

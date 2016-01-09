@@ -1,16 +1,30 @@
-language: haskell
+language: c
+
 sudo: false
-ghc: 7.10
+env: CABALVER=1.22 GHCVER=7.10.3
+addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.3],sources: [hvr-ghc]}}
+
+
+
+before_install:
+  - export PATH=/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:$PATH
 
 install:
-  - cabal --version
-  - cabal install --dependencies-only
-  - cabal configure --enable-tests --enable-library-coverage
+ - cabal --version
+ - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
+ - travis_retry cabal update
+ - cabal install --only-dependencies --enable-tests
 
 script:
-  - cabal build
-  - cabal test
-  
+ - cabal configure --enable-tests --enable-coverage
+ - cabal build
+ - cabal test --show-details=always
+
 after_script:
-  - cabal install hpc-coveralls
-  - hpc-coveralls hspec
+ - cabal install hpc-coveralls
+ - export PATH=~/.cabal/bin:$PATH
+ - hpc-coveralls --coverage-mode=StrictlyFullLines
+                 --exclude-dir=test
+                 hspec
+notifications:
+  email: false
