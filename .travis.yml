@@ -22,7 +22,8 @@ install:
 
 script:
   - stack build --no-terminal
-  - cabal configure --enable-tests --enable-coverage
+  - stack test --coverage
+  - cabal configure --enable-tests --enable-library-coverage
   - cabal test
 
 after_script:
