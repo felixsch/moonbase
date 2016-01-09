@@ -4,15 +4,13 @@ ghc: 7.10
 
 install:
   - cabal --version
-  - cabal configure --enable-tests --enable-library-coverage
   - cabal install --dependencies-only
+  - cabal configure --enable-tests --enable-library-coverage
 
 script:
   - cabal build
   - cabal test
-  - cabal configure --enable-tests --enable-library-coverage
-  - cabal test
-
+  
 after_script:
   - cabal install hpc-coveralls
   - hpc-coveralls hspec
