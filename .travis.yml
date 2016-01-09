@@ -1,28 +1,15 @@
 language: haskell
 sudo: false
-
-env:
-  - GHCVER=7.10.2 STACK_YAML=stack.yaml
-
-cache:
-  directories:
-    - $HOME/.stack/
-
-before_install:
-  - mkdir -p $HOME/.local/bin
-  - export STACK_VERSION=0.1.8.0
-  - export PATH=$HOME/.local/bin:$PATH
-  - export STACK_FULLVERSION=stack-$STACK_VERSION-linux-x86_64
-  - travis_retry curl -L https://github.com/commercialhaskell/stack/releases/download/v$STACK_VERSION/$STACK_FULLVERSION.tar.gz | tar xz --strip-components 1 -C ~/.local/bin $STACK_FULLVERSION/stack;
-  - chmod a+x $HOME/.local/bin/stack
-  - stack --version
+ghc: 7.10
 
 install:
-  - stack setup --no-terminal
+  - cabal --version
+  - cabal configure --enable-tests --enable-library-coverage
+  - cabal install --dependencies-only
 
 script:
-  - stack build --no-terminal
-  - stack test --coverage
+  - cabal build
+  - cabal test
   - cabal configure --enable-tests --enable-library-coverage
   - cabal test
 
