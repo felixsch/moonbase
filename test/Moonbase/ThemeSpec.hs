@@ -1,7 +1,7 @@
 module Moonbase.ThemeSpec where
 
-import           Test.Fake
 import           Test.Hspec
+import           Test.Fake
 
 import           Moonbase.Theme
 

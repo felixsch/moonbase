@@ -3,12 +3,12 @@ module Moonbase.CoreSpec where
 import           Test.Fake
 import           Test.Hspec
 
-import Moonbase.Core
+import           Moonbase.Core
 
 spec :: Spec
 spec = do
   describe "#moon" $
-    it "test implementation" $
+    it "checks if functions " $
       pending
   describe "#eval" $
     it "test implementation" $

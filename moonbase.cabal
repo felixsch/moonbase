@@ -35,7 +35,13 @@ library
          , process
          , dyre
          , dbus
+         , vector
          , optparse-applicative
+
+         -- this is only here to make atoms haskell-ide happy
+         , hspec
+         , hspec-expectations
+         , HUnit
 
 executable moonbase
   hs-source-dirs:      src
@@ -50,16 +56,22 @@ test-suite hspec
   hs-source-dirs:      test
   main-is:             HSpec.hs
   build-depends:       base
+                     , lens
+                     , mtl
+                     , containers
                      , hspec
+                     , hspec-expectations
                      , HUnit
                      , QuickCheck
+                     , vector
                      , moonbase
-                     
+
   default-language:    Haskell2010
   other-modules:       Moonbase.CoreSpec
                      , Moonbase.ThemeSpec
                      , Moonbase.CliSpec
                      , Moonbase.DBusSpec
+                     , Test.Fake
 
 source-repository head
   type:     git

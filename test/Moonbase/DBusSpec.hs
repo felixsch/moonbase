@@ -1,9 +1,9 @@
 module Moonbase.DBusSpec where
 
-import           Test.Fake
 import           Test.Hspec
+import           Test.Fake
 
-import Moonbase.DBus
+import           Moonbase.DBus
 
 spec :: Spec
 spec = describe "Moonbase.DBus" $
