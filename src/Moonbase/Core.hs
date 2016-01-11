@@ -9,26 +9,16 @@ module Moonbase.Core
  , Moon(..)
  , Base(..)
  , Moonbase(..)
+ , MB(..)
  , moon
  , eval
  , Message(..)
-
  , DBusClient
- , Argument
-
+ , ActionType(..)
  , Action(..)
- , actionName, actionHelp, action
- , ActionError(..)
- , ActionResult(..)
- , actionResult
- , actionError
- , actionNothing
-
- , Runtime(..)
- , hdl, actions, theme, dbus, isVerbose
+ , actionName, actionType, actionHelp, action
 
  -- re-imports
- , get, put, modify
  , ask
  , E.throw
  ) where
@@ -68,7 +58,6 @@ data Message = Warning    -- ^ A warning
              | Debug      -- ^ Debuging output
              deriving (Show, Eq, Enum)
 
-
 class Monad m => Moon m where
   io      :: IO a -> m a
   puts    :: String -> m ()
@@ -78,72 +67,44 @@ class Monad m => Moon m where
 
 class Base rt where
   data BaseRef rt :: *
-  newBase :: (Moon m) => rt -> m (BaseRef rt)
-  base :: (Moon m) => BaseRef rt -> m rt
-  update :: (Moon m) => BaseRef rt -> rt -> m ()
-
-  logB  :: (Moon m) => BaseRef rt -> Message -> m ()
-  dbusB :: (Moon m) => BaseRef rt -> m DBusClient
-
-  addActionB :: (Moon m) => BaseRef rt -> String -> Action rt m -> Moonbase st m ()
-  allActionsB :: (Moon m) => BaseRef rt -> Moonbase st m [Action rt m]
-
-
+  log       :: (Moon m) => Message -> MB rt m ()
+  dbus      :: (Moon m) => MB rt m DBusClient
+  theme     :: (Moon m) => MB rt m Theme
+  verbose   :: (Moon m) => MB rt m Bool
+  add       :: (Moon m) => String -> Action m rt -> MB rt m ()
+  actions   :: (Moon m) => MB rt m (M.Map String (Action m rt))
 
 -- Actions ---------------------------------------------------------------------
 
-type Argument = String
-data ActionError = ActionNotFound
-                  | ActionFileNotFound
-                  | ActionError String
-                  deriving (Show)
-
-type ActionResult = Either ActionError (Maybe String)
-
-actionError :: ActionError -> ActionResult
-actionError = Left
-
-actionResult :: (Show a) => a -> ActionResult
-actionResult = Right . Just . show
-
-actionNothing :: ActionResult
-actionNothing = Right Nothing
+data ActionType = ActionCommand
+                | ActionFunction
+                | ActionRaw
 
 data Action rt m = Action
   { _actionName :: String
   , _actionHelp :: String
-  , _action     :: [Argument] -> Moonbase rt m ActionResult }
+  , _actionType :: ActionType
+  , _action     :: [String] -> MB rt m String }
 
-
--- Runtime ---------------------------------------------------------------------
--- TODO: Move me to Moonbase.hs
-data Runtime m = Runtime
- { _hdl       :: Handle
- , _actions   :: [Action (Runtime m) m]
- , _theme     :: Theme
- , _isVerbose :: Bool
- , _dbus      :: DBusClient }
-
+-- command "toggle" `on` "top-panel" `with` do
 
 -- Moonbase --------------------------------------------------------------------
 
-newtype (Base rt) => Moonbase rt m a = Moonbase (ReaderT (BaseRef rt) m a)
+class (Moon m, Base rt) => Moonbase rt m
+
+
+newtype (Moonbase rt m) => MB rt m a = MB (ReaderT (BaseRef rt) m a)
   deriving (Functor, Monad, MonadReader (BaseRef rt))
 
-moon :: (Moon m, Base rt) => m a -> Moonbase rt m a
-moon = Moonbase . lift
+moon :: (Moonbase rt m) => m a -> MB rt m a
+moon = MB . lift
 
-instance (Monad m) => Applicative (Moonbase rt m) where
+instance (Monad m) => Applicative (MB rt m) where
   pure  = return
   (<*>) = ap
 
-instance (Moon m, Base rt) => MonadState rt (Moonbase rt m) where
-  get = base =<< ask
-  put rt = do
-    ref <- ask
-    update ref rt
 
-instance (Base rt, Moon m) => Moon (Moonbase rt m) where
+instance (Moonbase rt m) => Moon (MB rt m) where
   io      = moon . io
   puts    = moon . puts
   content = moon . content
@@ -155,8 +116,18 @@ instance (Base rt, Moon m) => Moon (Moonbase rt m) where
     moon $ timeout s (eval ref f)
 
 
-eval :: (Base rt, Moon m) => BaseRef rt -> Moonbase rt m a -> m a
-eval ref (Moonbase f) = runReaderT f ref
+eval :: (Moonbase rt m) => BaseRef rt -> MB rt m a -> m a
+eval ref (MB f) = runReaderT f ref
+
+
+-- Runtime ---------------------------------------------------------------------
+-- TODO: Move me to Moonbase.hs
+--data Runtime m = Runtime
+-- { _hdl       :: Handle
+-- , _actions   :: [Action (Runtime m) m]
+-- , _theme     :: Theme
+-- , _isVerbose :: Bool
+-- , _dbus      :: DBusClient }
+-- makeLenses ''Runtime
 
 makeLenses ''Action
-makeLenses ''Runtime
