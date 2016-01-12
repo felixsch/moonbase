@@ -19,6 +19,48 @@ test_exception = describe "Exceptions" $
                   , "No such file or directory: /sample"
                   , "Bye!" ]
 
+test_message :: SpecWith ()
+test_message = describe "Message" $
+  it "shows the correct show string for each message" $
+    map show testMessages `shouldBe` testStrings
+  where
+    testMessages = [ Warning "warning"
+                   , Info "info"
+                   , Success "success"
+                   , Debug "debug" ]
+    testStrings  = [ "Warning: warning"
+                   , "Info: info"
+                   , "Success: success"
+                   , "Debug: debug" ]
+
+test_actiontype :: SpecWith ()
+test_actiontype = describe "ActionType" $ do
+  it "shows the correct show string for each message" $
+    map show testTypes `shouldBe` testStrings
+  it "tests the equality of ActionTypes" $ do
+    ActionCommand == ActionCommand `shouldBe` True
+    ActionCommand /= ActionRaw `shouldBe` True
+    ActionFunction == ActionFunction `shouldBe` True
+    ActionFunction /= ActionRaw `shouldBe` True
+  where
+    testTypes   = [ ActionCommand, ActionFunction, ActionRaw ]
+    testStrings = [ "ActionCommand", "ActionFunction", "ActionRaw" ]
+
+test_action :: SpecWith ()
+test_action = describe "Action" $
+  it "test all records fields of a Action" $ do
+   _actionName a `shouldBe` "foo"
+   _actionHelp a `shouldBe` "bar"
+   _actionType a `shouldBe` ActionRaw
+  where
+    a = Action { _actionName = "foo"
+               , _actionHelp = "bar"
+               , _actionType = ActionRaw
+               , _action     = actionF }
+    actionF :: [String] -> FakeMB String
+    actionF _ = return "test"
+
+
 test_moon :: SpecWith ()
 test_moon = describe "#moon" $
   it "checks if moon lifts a computation to Moonbase" $
@@ -44,7 +86,11 @@ test_eval = describe "#eval" $
 spec :: Spec
 spec = do
   test_exception
+  test_message
+  test_action
+  test_actiontype
   test_moon
+  test_eval
 
   describe "#action" $
     it "test implementation" $

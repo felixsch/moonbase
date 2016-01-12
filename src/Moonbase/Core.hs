@@ -22,7 +22,6 @@ module Moonbase.Core
  , E.throw
  ) where
 
-import Prelude   hiding (log)
 import           Control.Applicative
 import           Control.Concurrent
 import qualified Control.Exception    as E
@@ -30,6 +29,7 @@ import           Control.Lens
 import           Control.Monad
 import           Control.Monad.Reader
 import           Control.Monad.State
+import           Prelude              hiding (log)
 import           System.IO
 
 import qualified Data.Map             as M
@@ -62,7 +62,13 @@ data Message = Warning String   -- ^ A warning
              | Info String      -- ^ An information
              | Success String   -- ^ Successfully exectued action
              | Debug String     -- ^ Debuging output
-             deriving (Show, Eq)
+
+instance Show Message where
+  show (Warning str) = "Warning: " ++ str
+  show (Info    str) = "Info: " ++ str
+  show (Success str) = "Success: " ++ str
+  show (Debug   str) = "Debug: " ++ str
+
 
 class Monad m => Moon m where
   io      :: IO a -> m a
@@ -85,6 +91,7 @@ class (Moon m) => Moonbase rt m where
 data ActionType = ActionCommand
                 | ActionFunction
                 | ActionRaw
+                deriving (Eq, Show)
 
 data Action rt m = Action
   { _actionName :: String
