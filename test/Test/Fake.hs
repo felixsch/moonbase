@@ -1,11 +1,29 @@
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell            #-}
-module Test.Fake where
+{-# LANGUAGE TypeFamilies               #-}
+module Test.Fake
+  ( FakeMoon(..)
+  , Base(..)
+  , MoonTest(..)
+  , FMT
+  , FakeMB
+  , evalTest, newEvalTest
+  , fake, fakeWith
+  , allowContent, allowAction
+  -- Expectations
+  , outputIs, outputMatches
+  , hasForked, hasSetupTimeout
+  -- reexports
+  , get
+  ) where
 
 import           Control.Concurrent
 import           Control.Lens
 import           Control.Monad
 import           Control.Monad.State
+import           Control.Monad.Identity
 import           Data.List
 import qualified Data.Map                as M
 import qualified Data.Vector             as V
@@ -16,62 +34,88 @@ import           Test.Hspec.Expectations
 import           Test.HUnit.Lang
 
 import           Moonbase.Core
+import           Moonbase.Theme
 
 
 type FakeDBus = Int
 type FakeBase = Int
 
-data FakeMoon = FakeMoon
+data FakeMoon m = FakeMoon
   { _output         :: V.Vector String
   , _allowedContent :: M.Map FilePath String
   , _forkCount      :: Int
   , _timeoutCount   :: Int
-  , _baseCount      :: Int
-  , _log            :: V.Vector Message
+  , _loggedMessages :: V.Vector Message
   , _allActions     :: M.Map String Bool
-  , _requireTheme   :: Bool
-  , _dbusStub       :: FakeDBus }
+  , _allowedActions :: M.Map String (Action (FakeMoon m) m)
+  , _requireTheme   :: Bool }
 
-emptyFakeMoon :: FakeMoon
+emptyFakeMoon :: FakeMoon m
 emptyFakeMoon = FakeMoon
   { _output         = V.empty
   , _allowedContent = M.empty
   , _forkCount      = 0
   , _timeoutCount   = 0
-  , _baseCount      = 0
-  , _log            = V.empty
+  , _loggedMessages = V.empty
   , _allActions     = M.empty
-  , _requireTheme   = False
-  , _dbusStub       = 0 }
+  , _allowedActions = M.empty
+  , _requireTheme   = False }
 
 makeLenses ''FakeMoon
 
-newtype MoonTest a = MoonTest (StateT FakeMoon IO a)
-  deriving (Functor, Monad, MonadState FakeMoon)
+newtype MoonTest a = MoonTest (StateT (FakeMoon MoonTest) IO a)
+  deriving (Functor, Monad, MonadState (FakeMoon MoonTest))
+
+type FMT = FakeMoon MoonTest
+type FakeMB a = MB FMT MoonTest a
 
 instance Applicative MoonTest where
   pure  = return
   (<*>) = ap
 
-evalTest :: FakeMoon -> MoonTest a -> IO (a, FakeMoon)
+instance MonadState FMT (MB FMT MoonTest) where
+  get = moon get
+  put = moon . put
+
+evalTest :: FMT -> MoonTest a -> IO (a, FMT)
 evalTest st (MoonTest f) = runStateT f st
 
-newEvalTest :: MoonTest a -> IO (a, FakeMoon)
+newEvalTest :: MoonTest a -> IO (a, FMT)
 newEvalTest (MoonTest f) = runStateT f emptyFakeMoon
 
-fake :: MoonTest a -> IO a
-fake f = fst <$> newEvalTest f
+runFakeMB :: FakeMB a -> MoonTest a
+runFakeMB f = do
+  st <- get
+  eval (FakeBase st) f
 
-allowContent :: FilePath -> String -> MoonTest ()
+fakeWith :: FakeMB a -> IO (a, FMT)
+fakeWith = newEvalTest . runFakeMB
+
+fake :: FakeMB a -> IO a
+fake f = fst <$> fakeWith f
+
+allowContent :: FilePath -> String -> FakeMB ()
 allowContent path content = allowedContent . at path ?= content
 
--- Fake Moon Implementation ----------------------------------------------------
+allowAction :: String -> Action FMT MoonTest -> FakeMB ()
+allowAction name action = allowedActions . at name ?= action
+
+-- Moonbase Implementation ----------------------------------------------------
 instance Moon MoonTest where
   io       = MoonTest . lift
   puts str = output %= (|> str)
   content  = selectContent
   fork     = forkTestMoon
+  delay    = io . threadDelay
   timeout  = timeoutTestMoon
+
+instance Moonbase FMT MoonTest where
+  data Base FMT = FakeBase FMT
+  log msg = loggedMessages %= (|> msg)
+  theme   = requireTheme .= True >> return defaultTheme
+  verbose = return False
+  add n _ = allActions . at n ?= True
+  actions = use allowedActions
 
 selectContent :: FilePath -> MoonTest String
 selectContent path = do
@@ -96,15 +140,15 @@ timeoutTestMoon ms f = do
   timeoutCount += 1
   io $ T.timeout ms (fst <$> evalTest rt f)
 
--- Moon Expectations -----------------------------------------------------------
-outputIs :: MoonTest a -> [String] -> Expectation
+-- Expectations -----------------------------------------------------------
+outputIs :: FakeMB a -> [String] -> Expectation
 outputIs f t = do
-  (_, rt) <- newEvalTest f
+  (_, rt) <- fakeWith f
   V.toList (rt ^. output) `shouldBe` t
 
-outputMatches :: MoonTest a -> String -> Expectation
+outputMatches :: FakeMB a -> String -> Expectation
 outputMatches f t = do
-  (_, rt) <- newEvalTest f
+  (_, rt) <- fakeWith f
   case V.find (isInfixOf t) (rt ^. output) of
     Just _ -> return ()
     Nothing -> assertFailure (notFound $ rt ^. output)
@@ -113,12 +157,12 @@ outputMatches f t = do
                                 , "Output is:" ] ++ V.toList (formatOutput output)
     formatOutput = V.imap (\i l -> show i ++ ": " ++ l)
 
-hasForked :: MoonTest a -> Int -> Expectation
+hasForked :: FakeMB a -> Int -> Expectation
 hasForked f times = do
-  (_, rt) <- newEvalTest f
+  (_, rt) <- fakeWith f
   rt ^. forkCount `shouldBe` times
 
-hasSetupTimeout :: MoonTest a -> Int -> Expectation
+hasSetupTimeout :: FakeMB a -> Int -> Expectation
 hasSetupTimeout f times = do
-  (_, rt) <- newEvalTest f
+  (_, rt) <- fakeWith f
   rt ^. timeoutCount `shouldBe` times

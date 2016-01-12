@@ -7,7 +7,6 @@
 module Moonbase.Core
  ( Exception(..)
  , Moon(..)
- , Base(..)
  , Moonbase(..)
  , MB(..)
  , moon
@@ -23,6 +22,7 @@ module Moonbase.Core
  , E.throw
  ) where
 
+import Prelude   hiding (log)
 import           Control.Applicative
 import           Control.Concurrent
 import qualified Control.Exception    as E
@@ -48,31 +48,37 @@ data Exception = CouldNotOpenDisplay
                | DBusError String
                | FileNotFound FilePath
                | Shutdown
-               deriving (Show)
 
-instance E.Exception Exception
+instance Show Exception where
+  show CouldNotOpenDisplay = "Could not open display"
+  show (DBusError err)     = "DBus error: " ++ err
+  show (FileNotFound path) = "No such file or directory: " ++ path
+  show Shutdown            = "Bye!"
 
-data Message = Warning    -- ^ A warning
-             | Info       -- ^ An information
-             | Success    -- ^ Successfully exectued action
-             | Debug      -- ^ Debuging output
-             deriving (Show, Eq, Enum)
+
+--instance E.Exception Exception
+
+data Message = Warning String   -- ^ A warning
+             | Info String      -- ^ An information
+             | Success String   -- ^ Successfully exectued action
+             | Debug String     -- ^ Debuging output
+             deriving (Show, Eq)
 
 class Monad m => Moon m where
   io      :: IO a -> m a
   puts    :: String -> m ()
   content :: FilePath -> m String
   fork    :: m () -> m ThreadId
+  delay   :: Int -> m ()
   timeout :: Int -> m a  -> m (Maybe a)
 
-class Base rt where
-  data BaseRef rt :: *
-  log       :: (Moon m) => Message -> MB rt m ()
-  dbus      :: (Moon m) => MB rt m DBusClient
-  theme     :: (Moon m) => MB rt m Theme
-  verbose   :: (Moon m) => MB rt m Bool
-  add       :: (Moon m) => String -> Action m rt -> MB rt m ()
-  actions   :: (Moon m) => MB rt m (M.Map String (Action m rt))
+class (Moon m) => Moonbase rt m where
+  data Base rt :: *
+  log       :: Message -> MB rt m ()
+  theme     :: MB rt m Theme
+  verbose   :: MB rt m Bool
+  add       :: String -> Action rt m -> MB rt m ()
+  actions   :: MB rt m (M.Map String (Action rt m))
 
 -- Actions ---------------------------------------------------------------------
 
@@ -90,11 +96,8 @@ data Action rt m = Action
 
 -- Moonbase --------------------------------------------------------------------
 
-class (Moon m, Base rt) => Moonbase rt m
-
-
-newtype (Moonbase rt m) => MB rt m a = MB (ReaderT (BaseRef rt) m a)
-  deriving (Functor, Monad, MonadReader (BaseRef rt))
+newtype (Moonbase rt m) => MB rt m a = MB (ReaderT (Base rt) m a)
+  deriving (Functor, Monad, MonadReader (Base rt))
 
 moon :: (Moonbase rt m) => m a -> MB rt m a
 moon = MB . lift
@@ -103,7 +106,6 @@ instance (Monad m) => Applicative (MB rt m) where
   pure  = return
   (<*>) = ap
 
-
 instance (Moonbase rt m) => Moon (MB rt m) where
   io      = moon . io
   puts    = moon . puts
@@ -111,12 +113,13 @@ instance (Moonbase rt m) => Moon (MB rt m) where
   fork f  = do
     ref <- ask
     moon $ fork (void $ eval ref f)
+  delay   = moon . delay
   timeout s f = do
     ref <- ask
     moon $ timeout s (eval ref f)
 
 
-eval :: (Moonbase rt m) => BaseRef rt -> MB rt m a -> m a
+eval :: (Moonbase rt m) => Base rt -> MB rt m a -> m a
 eval ref (MB f) = runReaderT f ref
 
 
