@@ -13,6 +13,8 @@ module Test.Fake
   , fake, fakeWith
   , allowContent, allowAction
   -- Expectations
+  , computes
+  , isSameAs
   , outputIs, outputMatches
   , hasForked, hasSetupTimeout
   -- reexports
@@ -141,6 +143,15 @@ timeoutTestMoon ms f = do
   io $ T.timeout ms (fst <$> evalTest rt f)
 
 -- Expectations -----------------------------------------------------------
+
+computes :: (Show a, Eq a) => FakeMB a -> a -> Expectation
+computes f value = fake f `shouldReturn` value
+
+isSameAs :: (Show a, Eq a) => FakeMB a -> FakeMB a -> Expectation
+isSameAs f1 f2 = do
+  v2 <- fake f2
+  fake f1 `shouldReturn` v2
+
 outputIs :: FakeMB a -> [String] -> Expectation
 outputIs f t = do
   (_, rt) <- fakeWith f

@@ -2,7 +2,8 @@ module Moonbase.CoreSpec where
 
 import           Test.Fake
 import           Test.Hspec
-
+import           Test.Hspec.QuickCheck
+import           Test.QuickCheck hiding (Success)
 import           Moonbase.Core
 
 test_exception :: SpecWith ()
@@ -33,25 +34,32 @@ test_message = describe "Message" $
                    , "Success: success"
                    , "Debug: debug" ]
 
+instance Arbitrary ActionType where
+  arbitrary = do
+    i <- choose (0, 2) :: Gen Int
+    return $ [ActionCommand, ActionFunction, ActionRaw] !! i
+
 test_actiontype :: SpecWith ()
 test_actiontype = describe "ActionType" $ do
   it "shows the correct show string for each message" $
     map show testTypes `shouldBe` testStrings
-  it "tests the equality of ActionTypes" $ do
-    ActionCommand == ActionCommand `shouldBe` True
-    ActionCommand /= ActionRaw `shouldBe` True
-    ActionFunction == ActionFunction `shouldBe` True
-    ActionFunction /= ActionRaw `shouldBe` True
+  prop "tests the equality of ActionTypes" testEq
   where
+    testEq :: ActionType -> ActionType -> Bool
+    testEq a b = (a == b) /= (a /= b)
+
     testTypes   = [ ActionCommand, ActionFunction, ActionRaw ]
     testStrings = [ "ActionCommand", "ActionFunction", "ActionRaw" ]
 
 test_action :: SpecWith ()
-test_action = describe "Action" $
+test_action = describe "Action" $ do
   it "test all records fields of a Action" $ do
-   _actionName a `shouldBe` "foo"
-   _actionHelp a `shouldBe` "bar"
-   _actionType a `shouldBe` ActionRaw
+    _actionName a `shouldBe` "foo"
+    _actionHelp a `shouldBe` "bar"
+    _actionType a `shouldBe` ActionRaw
+  it "test the action record" $
+    fake (_action a []) `shouldReturn` "test"
+
   where
     a = Action { _actionName = "foo"
                , _actionHelp = "bar"
@@ -81,6 +89,17 @@ test_eval = describe "#eval" $
     runInMoonTest f = fst <$> newEvalTest (f =<< get)
 
 
+test_mb :: SpecWith ()
+test_mb = describe "MB" $
+  it "checks that MB type is a valid Functor instance" $ do
+    fmap id sample1 `isSameAs` id sample1
+    fmap ((+1) . (+1)) sample1 `isSameAs` (fmap (+1) . fmap (+1)) sample1
+
+  where
+    sample1 :: (Moonbase rt m) => MB rt m Int
+    sample1 = return 1
+
+
 
 
 spec :: Spec
@@ -90,6 +109,7 @@ spec = do
   test_action
   test_actiontype
   test_moon
+  test_mb
   test_eval
 
   describe "#action" $
