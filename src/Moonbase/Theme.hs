@@ -66,7 +66,7 @@ data Font = Font
   { fontName  :: String -- ^ the name of the font
   , fontSize  :: Int -- ^ size of the font in px
   , fontAttrs :: [FontAttr] } -- ^ attributes how the font should be displayed
-  deriving (Show)
+  deriving (Show, Eq)
 
 -- | marks a font as bold
 bold :: Font -> Font
@@ -122,7 +122,7 @@ droidMono = Font "Droid Sans Mono" 12 []
 -- | To make it more easy all different modes come with a triple of settings
 -- A foreground, font and a background color.
 data Style = Style Color Font Color
-  deriving (Show)
+  deriving (Show, Eq)
 
 -- | get the foreground
 fg :: Style -> Color
@@ -145,7 +145,7 @@ data Theme = Theme
   , active    :: Style    -- ^ If something is active (e.g the border of xmonad)
   , disabled  :: Style    -- ^ if something is disabled
   , frame     :: Style }  -- ^ the frame of something (e.g bar)
-  deriving (Show)
+  deriving (Show, Eq)
 
 -- | moonbase default theme
 defaultTheme :: Theme
