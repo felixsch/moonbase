@@ -5,9 +5,12 @@
 {-# LANGUAGE TypeFamilies               #-}
 module Test.Fake
   ( FakeMoon(..)
+  , output, allowedContent, forkCount, timeoutCount
+  , loggedMessages, allActions, allowedActions, requireTheme
   , Base(..)
   , MoonTest(..)
   , FMT
+  , unbase
   , FakeMB
   , evalTest, newEvalTest
   , fake, fakeWith
@@ -38,9 +41,6 @@ import           Test.HUnit.Lang
 import           Moonbase.Core
 import           Moonbase.Theme
 
-
-type FakeDBus = Int
-type FakeBase = Int
 
 data FakeMoon m = FakeMoon
   { _output         :: V.Vector String
@@ -118,6 +118,9 @@ instance Moonbase FMT MoonTest where
   verbose = return False
   add n _ = allActions . at n ?= True
   actions = use allowedActions
+
+unbase :: Base FMT -> FMT
+unbase (FakeBase f) = f
 
 selectContent :: FilePath -> MoonTest String
 selectContent path = do

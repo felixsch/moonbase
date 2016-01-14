@@ -1,9 +1,15 @@
 module Moonbase.CoreSpec where
 
+import           Control.Lens
+import           Control.Monad.Reader
+
+import qualified Data.Vector as V
+
 import           Test.Fake
 import           Test.Hspec
 import           Test.Hspec.QuickCheck
-import           Test.QuickCheck hiding (Success)
+import           Test.QuickCheck hiding (Success, output)
+
 import           Moonbase.Core
 
 test_exception :: SpecWith ()
@@ -41,8 +47,12 @@ instance Arbitrary ActionType where
 
 test_actiontype :: SpecWith ()
 test_actiontype = describe "ActionType" $ do
-  it "shows the correct show string for each message" $
+  it "shows the correct show string for each message" $ do
     map show testTypes `shouldBe` testStrings
+    show ActionCommand `shouldBe` "ActionCommand"
+    showsPrec 1 ActionCommand "foo" `shouldBe` "ActionCommandfoo"
+    showList [ActionCommand, ActionRaw] "" `shouldBe` "[ActionCommand,ActionRaw]"
+
   prop "tests the equality of ActionTypes" testEq
   where
     testEq :: ActionType -> ActionType -> Bool
@@ -89,16 +99,52 @@ test_eval = describe "#eval" $
     runInMoonTest f = fst <$> newEvalTest (f =<< get)
 
 
+
 test_mb :: SpecWith ()
-test_mb = describe "MB" $
+test_mb = describe "MB" $ do
   it "checks that MB type is a valid Functor instance" $ do
+     -- laws
     fmap id sample1 `isSameAs` id sample1
     fmap ((+1) . (+1)) sample1 `isSameAs` (fmap (+1) . fmap (+1)) sample1
+    -- functions
+    (Just <$ puts "test" <*> return 42) `isSameAs` (Just `defaultImpl` puts "test" <*> return 42)
 
+  it "checks that MB is a valid Monad" $ do
+    -- laws
+    (return 1 >>= sampleComp)   `isSameAs` sampleComp 1
+    (sampleComp >>= return $ 1) `isSameAs` sampleComp 1
+    (return 1 >>= (\x -> sampleComp x >>= sampleComp2)) `isSameAs` ((return 1 >>= sampleComp) >>= sampleComp2)
+    -- functions
+    -- (>>)
+    (puts "test" >> return 42) `computes` 42
+    -- fail
+    fake (fail "foo" >> return 1) `shouldThrow` anyIOException
+
+  it "checks if MB has a valid MonadReader instance" $ do
+    -- functions
+    (_forkCount . unbase <$> ask) `computes` 0
+    let setCount (FakeBase r) = FakeBase $ r { _forkCount = 42}
+    local setCount (use forkCount) `computes` 0
+
+    (puts "test" >> reader (\(FakeBase r) -> _output r)) `computes` V.fromList []
+
+  it "checks if the Applicative instance is correct" $ do
+    -- TODO: Obey the laws!
+    pure 42 `isSameAs` return 42
+
+  it
   where
     sample1 :: (Moonbase rt m) => MB rt m Int
     sample1 = return 1
 
+    sampleComp :: (Moonbase rt m) => Int -> MB rt m Int
+    sampleComp = return . (1 +)
+
+    sampleComp2 :: (Moonbase rt m) => Int -> MB rt m Int
+    sampleComp2 = return . (2 +)
+
+    defaultImpl :: (Functor f) => a -> f b -> f a
+    defaultImpl = fmap . const
 
 
 
@@ -111,37 +157,3 @@ spec = do
   test_moon
   test_mb
   test_eval
-
-  describe "#action" $
-    it "test implementation" $
-      pending
-  describe "#actionHelp" $
-    it "test implementation" $
-      pending
-  describe "#actionName" $
-    it "test implementation" $
-      pending
-  describe "#actionResult" $
-    it "test implementation" $
-      pending
-  describe "#actionError" $
-    it "test implementation" $
-      pending
-  describe "#actionNothing" $
-    it "test implementation" $
-      pending
-  describe "#hdl" $
-    it "test implementation" $
-      pending
-  describe "#actions" $
-    it "test implementation" $
-      pending
-  describe "#theme" $
-    it "test implementation" $
-      pending
-  describe "#dbus" $
-    it "test implementation" $
-      pending
-  describe "#isVerbose" $
-    it "test implementation" $
-      pending
