@@ -70,6 +70,12 @@ test_action = describe "Action" $ do
   it "test the action record" $
     fake (_action a []) `shouldReturn` "test"
 
+  it "tests the created lenses" $ do
+    a ^. actionName `shouldBe` "foo"
+    a ^. actionHelp `shouldBe` "bar"
+    a ^. actionType `shouldBe` ActionRaw
+    (a ^. action) [] `computes` "test"
+
   where
     a = Action { _actionName = "foo"
                , _actionHelp = "bar"
@@ -128,11 +134,12 @@ test_mb = describe "MB" $ do
 
     (puts "test" >> reader (\(FakeBase r) -> _output r)) `computes` V.fromList []
 
-  it "checks if the Applicative instance is correct" $ do
-    -- TODO: Obey the laws!
+  it "checks if the Applicative instance is correct" $
     pure 42 `isSameAs` return 42
 
-  it
+  it "runs a io action inside of the MB monad" $
+    io (return $ 1 + 1 ) `computes` 2
+
   where
     sample1 :: (Moonbase rt m) => MB rt m Int
     sample1 = return 1

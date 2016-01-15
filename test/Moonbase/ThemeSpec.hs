@@ -24,11 +24,23 @@ spec = do
       color_ "#ff" `shouldBe` "#ff00ff"
       color_ "#aabbxx" `shouldBe` "#ff00ff"
 
-  describe "Font" $
-    it "checks if a records setup correctly" $ do
+  describe "FontAttr" $ do
+    it "shows that FontAttr has a correct Eq instance" $ do
+      Bold == Bold `shouldBe` True
+      Italic /= Bold `shouldBe` True
+
+  describe "Font" $ do
+    it "checks if the records setup correctly" $ do
       fontName  testFont `shouldBe` "Monospace"
       fontSize  testFont `shouldBe` 12
       fontAttrs testFont `shouldBe` [Italic]
+    it "checks if Eq works" $ do
+      testFont == testFont `shouldBe` True
+      testFont /= Font "" 8 [] `shouldBe` True
+    it "checks if Show works correctly" $ do
+      show testFont `shouldBe` "Font {fontName = \"Monospace\", fontSize = 12, fontAttrs = [Italic]}"
+      showsPrec 1 testFont "foo" `shouldBe` "Font {fontName = \"Monospace\", fontSize = 12, fontAttrs = [Italic]}foo"
+      showList [testFont] "" `shouldBe` "[Font {fontName = \"Monospace\", fontSize = 12, fontAttrs = [Italic]}]"
 
   describe "#italic" $
     it "adds the italic Attribute to a font" $
@@ -49,6 +61,16 @@ spec = do
       droid `shouldBe` Font "Droid Sans" 12 []
       droidMono `shouldBe` Font "Droid Sans Mono" 12 []
 
+  describe "Style" $ do
+    it "checks if Style has a valid Eq instance" $ do
+      testStyle == testStyle `shouldBe` True
+      testStyle /= testStyle `shouldBe` False
+    it "checks if Style has a valid Show instance" $ do
+      show testStyle `shouldBe` "Style \"#fff\" (Font {fontName = \"Sans\", fontSize = 12, fontAttrs = []}) \"#ccc\""
+      showsPrec 1 testStyle "foo" `shouldBe` "Style \"#fff\" (Font {fontName = \"Sans\", fontSize = 12, fontAttrs = []}) \"#ccc\"foo"
+      showList [testStyle] "" `shouldBe` "[Style \"#fff\" (Font {fontName = \"Sans\", fontSize = 12, fontAttrs = []}) \"#ccc\"]"
+
+
   describe "#fg" $
     it "selects the foreground color of a style" $
       fg testStyle `shouldBe` "#fff"
@@ -65,13 +87,16 @@ spec = do
     it "the default color should be magenta" $
       defaultColor `shouldBe` "#ff00ff"
 
-  describe "Theme" $
+  describe "Theme" $ do
     it "checks if records are setup correctly" $ do
       fg (normal testTheme) `shouldBe` "#ffffff"
       fg (highlight testTheme) `shouldBe` "#268BD2"
       fg (active testTheme) `shouldBe` "#9ec400"
       fg (disabled testTheme) `shouldBe` "#808080"
       fg (frame testTheme) `shouldBe` "#151515"
+    it "shows that Theme has a valid Eq instance" $ do
+      testTheme == testTheme `shouldBe` True
+      testTheme /= defaultTheme `shouldBe` False
 
   describe "defaultTheme" $
     it "checks for a sane default theme" $
