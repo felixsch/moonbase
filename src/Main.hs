@@ -1,4 +1,10 @@
 module Main where
 
+import Moonbase
+
 main :: IO ()
-main = putStrLn "Not implemented yet"
+main = moonbase $ do
+  puts "Test Moonbase"
+  delay 200000
+  puts "Haha"
+  quit

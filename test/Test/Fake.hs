@@ -14,7 +14,7 @@ module Test.Fake
   , FakeMB
   , evalTest, newEvalTest
   , fake, fakeWith
-  , allowContent, allowAction
+  , allowContent, allowAction, allowTerm
   -- Expectations
   , computes
   , isSameAs
@@ -50,6 +50,8 @@ data FakeMoon m = FakeMoon
   , _loggedMessages :: V.Vector Message
   , _allActions     :: M.Map String Bool
   , _allowedActions :: M.Map String (Action (FakeMoon m) m)
+  , _quitSignal     :: Bool
+  , _allowedTerms   :: V.Vector String
   , _requireTheme   :: Bool }
 
 emptyFakeMoon :: FakeMoon m
@@ -61,6 +63,8 @@ emptyFakeMoon = FakeMoon
   , _loggedMessages = V.empty
   , _allActions     = M.empty
   , _allowedActions = M.empty
+  , _allowedTerms   = V.empty
+  , _quitSignal     = False
   , _requireTheme   = False }
 
 makeLenses ''FakeMoon
@@ -102,6 +106,9 @@ allowContent path content = allowedContent . at path ?= content
 allowAction :: String -> Action FMT MoonTest -> FakeMB ()
 allowAction name action = allowedActions . at name ?= action
 
+allowTerm :: [String] -> FakeMB ()
+allowTerm args = allowedTerms %= (|> unwords args)
+
 -- Moonbase Implementation ----------------------------------------------------
 instance Moon MoonTest where
   io       = MoonTest . lift
@@ -113,21 +120,34 @@ instance Moon MoonTest where
 
 instance Moonbase FMT MoonTest where
   data Base FMT = FakeBase FMT
-  log msg = loggedMessages %= (|> msg)
-  theme   = requireTheme .= True >> return defaultTheme
-  verbose = return False
-  add n _ = allActions . at n ?= True
-  actions = use allowedActions
+  log msg   = loggedMessages %= (|> msg)
+  theme     = requireTheme .= True >> return defaultTheme
+  withTheme _ = requireTheme .= True
+  verbose   = return False
+  add n _   = allActions . at n ?= True
+  actions   = use allowedActions
+  terminal  = selectTerminal
+  withTerminal _ = return () -- FIXME
+  quit     = quitSignal .= True
 
 unbase :: Base FMT -> FMT
 unbase (FakeBase f) = f
+
+selectTerminal :: [String] -> MB FMT MoonTest ()
+selectTerminal args = do
+  terms <- use allowedTerms
+  unless (V.elem (unwords args) terms) (io $ assertFailure (unlines notAllowedTerm))
+  where
+    notAllowedTerm = [ "*** Unstubbed terminal requested ***"
+                     , "requested term:" ++ show args
+                     , "to stub this output use: allowTerm [args]" ]
 
 selectContent :: FilePath -> MoonTest String
 selectContent path = do
   ctnt <- use allowedContent
   case ctnt ^? ix path of
     Just c  -> return c
-    Nothing -> error (unlines notAllowedContent)
+    Nothing -> io (assertFailure (unlines notAllowedContent)) >> return "FAILED"
   where
     notAllowedContent = [ "*** Unstubbed content requested ***"
                         , "requested path:" ++ show path

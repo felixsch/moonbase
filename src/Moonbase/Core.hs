@@ -76,15 +76,19 @@ class Monad m => Moon m where
   content :: FilePath -> m String
   fork    :: m () -> m ThreadId
   delay   :: Int -> m ()
-  timeout :: Int -> m a  -> m (Maybe a)
+  timeout :: Int -> m a -> m (Maybe a)
 
 class (Moon m) => Moonbase rt m where
   data Base rt :: *
-  log       :: Message -> MB rt m ()
-  theme     :: MB rt m Theme
-  verbose   :: MB rt m Bool
-  add       :: String -> Action rt m -> MB rt m ()
-  actions   :: MB rt m (M.Map String (Action rt m))
+  log          :: Message -> MB rt m ()
+  theme        :: MB rt m Theme
+  withTheme    :: Theme -> MB rt m ()
+  verbose      :: MB rt m Bool
+  add          :: String -> Action rt m -> MB rt m ()
+  actions      :: MB rt m (M.Map String (Action rt m))
+  terminal     :: [String] -> MB rt m ()
+  withTerminal :: ([String] -> MB rt m ()) -> MB rt m ()
+  quit         :: MB rt m ()
 
 -- Actions ---------------------------------------------------------------------
 
@@ -128,16 +132,5 @@ instance (Moonbase rt m) => Moon (MB rt m) where
 
 eval :: (Moonbase rt m) => Base rt -> MB rt m a -> m a
 eval ref (MB f) = runReaderT f ref
-
-
--- Runtime ---------------------------------------------------------------------
--- TODO: Move me to Moonbase.hs
---data Runtime m = Runtime
--- { _hdl       :: Handle
--- , _actions   :: [Action (Runtime m) m]
--- , _theme     :: Theme
--- , _isVerbose :: Bool
--- , _dbus      :: DBusClient }
--- makeLenses ''Runtime
 
 makeLenses ''Action
