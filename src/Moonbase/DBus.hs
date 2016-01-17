@@ -12,10 +12,12 @@ module Moonbase.DBus
   , withoutHelp
   , sanatizeName
   , moonbaseBusName
+  , moonbaseCliBusName
   , moonbaseInterfaceName
   , moonbaseObjectPath
   , withInterface
   , withObjectPath
+  , connectDBus
 
   -- re-expors
   , DBus.ObjectPath
@@ -76,6 +78,9 @@ sanatizeName (x:xs)     = x : sanatizeName xs
 moonbaseBusName :: DBus.BusName
 moonbaseBusName = "org.moonbase"
 
+moonbaseCliBusName :: DBus.BusName
+moonbaseCliBusName = "org.moonbase.cli"
+
 moonbaseInterfaceName :: DBus.InterfaceName
 moonbaseInterfaceName = "org.moonbase"
 
@@ -88,3 +93,11 @@ withInterface name = DBus.interfaceName_ $
 
 withObjectPath :: String -> DBus.ObjectPath
 withObjectPath name = DBus.objectPath_ $ DBus.formatObjectPath moonbaseObjectPath ++ "/" ++ name
+
+connectDBus :: DBus.BusName -> IO (Maybe DBus.Client)
+connectDBus bus = do
+        client <- DBus.connectSession
+        name   <- DBus.requestName client bus []
+        return $ case name of
+            DBus.NamePrimaryOwner -> Just client
+            _                     -> Nothing
