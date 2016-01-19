@@ -1,6 +1,6 @@
-{-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeFamilies               #-}
 module Test.Fake
@@ -27,11 +27,12 @@ module Test.Fake
 import           Control.Concurrent
 import           Control.Lens
 import           Control.Monad
-import           Control.Monad.State
 import           Control.Monad.Identity
+import           Control.Monad.State
 import           Data.List
 import qualified Data.Map                as M
 import qualified Data.Vector             as V
+import           System.Exit             (ExitCode (..))
 import qualified System.Timeout          as T
 
 import           Test.Hspec
@@ -52,6 +53,7 @@ data FakeMoon m = FakeMoon
   , _allowedActions :: M.Map String (Action (FakeMoon m) m)
   , _quitSignal     :: Bool
   , _allowedTerms   :: V.Vector String
+  , _allowedExec    :: M.Map String (ExitCode, String, String)
   , _requireTheme   :: Bool }
 
 emptyFakeMoon :: FakeMoon m
@@ -64,6 +66,7 @@ emptyFakeMoon = FakeMoon
   , _allActions     = M.empty
   , _allowedActions = M.empty
   , _allowedTerms   = V.empty
+  , _allowedExec    = M.empty
   , _quitSignal     = False
   , _requireTheme   = False }
 
@@ -109,6 +112,9 @@ allowAction name action = allowedActions . at name ?= action
 allowTerm :: [String] -> FakeMB ()
 allowTerm args = allowedTerms %= (|> unwords args)
 
+allowExec :: String -> (ExitCode, String, String) -> FakeMB ()
+allowExec cmd result = allowedExec . at cmd ?= result
+
 -- Moonbase Implementation ----------------------------------------------------
 instance Moon MoonTest where
   io       = MoonTest . lift
@@ -117,6 +123,7 @@ instance Moon MoonTest where
   fork     = forkTestMoon
   delay    = io . threadDelay
   timeout  = timeoutTestMoon
+  exec cmd args = selectExec $ unwords (cmd:args)
 
 instance Moonbase FMT MoonTest where
   data Base FMT = FakeBase FMT
@@ -132,6 +139,17 @@ instance Moonbase FMT MoonTest where
 
 unbase :: Base FMT -> FMT
 unbase (FakeBase f) = f
+
+selectExec :: String -> MoonTest (ExitCode, String, String)
+selectExec cmd = do
+  execs <- use allowedExec
+  case execs ^? ix cmd of
+    Just result -> return result
+    Nothing     -> io (assertFailure (unlines notAllowedExec)) >> return (ExitFailure 254, "", "")
+  where
+    notAllowedExec = [ "*** Unstubbed exec requested ***"
+                     , "requested exec :" ++ show cmd
+                     , "to stub use: allowEexec cmd [args]" ]
 
 selectTerminal :: [String] -> MB FMT MoonTest ()
 selectTerminal args = do

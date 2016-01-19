@@ -1,6 +1,6 @@
 module Main where
 
-import Moonbase
+import           Moonbase
 
 main :: IO ()
 main = moonbase $ do

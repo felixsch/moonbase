@@ -11,8 +11,9 @@ module Moonbase.Core
  , MB(..)
  , moon
  , eval
+ , spawn
+ , defaultTerminal
  , Message(..)
- , DBusClient
  , ActionType(..)
  , Action(..)
  , actionName, actionType, actionHelp, action
@@ -23,26 +24,21 @@ module Moonbase.Core
  ) where
 
 import           Control.Applicative
-import           Control.Concurrent
+import           Control.Concurrent   (ThreadId)
 import qualified Control.Exception    as E
 import           Control.Lens
-import           Control.Monad
 import           Control.Monad.Reader
-import           Control.Monad.State
-import           Prelude              hiding (log)
-import           System.IO
-
 import qualified Data.Map             as M
-import           Data.Monoid
-
-import qualified DBus.Client          as DBus
+import           Prelude              hiding (log)
+import           System.Directory
+import           System.Exit
+import           System.IO
+import           System.Process       (ProcessHandle)
 
 import           Moonbase.Theme
 
 
 -- Core Types ------------------------------------------------------------------
-
-type DBusClient = DBus.Client
 
 data Exception = CouldNotOpenDisplay
                | DBusError String
@@ -77,6 +73,7 @@ class Monad m => Moon m where
   fork    :: m () -> m ThreadId
   delay   :: Int -> m ()
   timeout :: Int -> m a -> m (Maybe a)
+  exec    :: String -> [String] -> m (ExitCode, String, String)
 
 class (Moon m) => Moonbase rt m where
   data Base rt :: *
@@ -103,8 +100,6 @@ data Action rt m = Action
   , _actionType :: ActionType
   , _action     :: [String] -> MB rt m String }
 
--- command "toggle" `on` "top-panel" `with` do
-
 -- Moonbase --------------------------------------------------------------------
 
 newtype (Moonbase rt m) => MB rt m a = MB (ReaderT (Base rt) m a)
@@ -128,9 +123,21 @@ instance (Moonbase rt m) => Moon (MB rt m) where
   timeout s f = do
     ref <- ask
     moon $ timeout s (eval ref f)
+  exec cmd args = moon $ exec cmd args
 
 
 eval :: (Moonbase rt m) => Base rt -> MB rt m a -> m a
 eval ref (MB f) = runReaderT f ref
+
+spawn :: (Moonbase rt m) => String -> [String] -> MB rt m (ExitCode, String, String)
+spawn cmd args = do
+  mpath <- io $ findExecutable cmd
+  case mpath of
+    Just path -> exec cmd args
+    Nothing   -> return (ExitFailure 255, "", "Could not find executable: " ++ cmd ++ " (args: " ++ show args ++ ")")
+
+defaultTerminal :: (Moonbase rt m) => [String] -> MB rt m ()
+defaultTerminal []   = void $ spawn "xterm" []
+defaultTerminal args = void $ spawn "xterm" ("-e":args)
 
 makeLenses ''Action

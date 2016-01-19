@@ -6,4 +6,6 @@ engines:
 
 ratings:
   paths:
-  - "**.hs"
+  - "src/*.hs"
+  - "src/Moonbase/*.hs"
+  - "src/Moonbase/Util/*.hs"

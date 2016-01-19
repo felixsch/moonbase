@@ -1,7 +1,7 @@
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeFamilies          #-}
 
 module Moonbase
   ( moonbase
@@ -10,32 +10,69 @@ module Moonbase
   , module Moonbase.Theme
   ) where
 
+import qualified Config.Dyre                   as Dy
 import           Control.Applicative
-import           Control.Lens                   hiding (argument, (<.>))
-import           Control.Monad
-import           Control.Concurrent
-import           Control.Monad.State
-import           Control.Monad.STM              (atomically)
-import           Control.Concurrent.STM.TVar
-import Control.Concurrent.STM.TMVar
-import qualified Config.Dyre                    as Dy
+import           Control.Concurrent            (forkIO, forkOS, threadDelay)
+import           Control.Concurrent.STM.TMVar
 import           Control.Concurrent.STM.TQueue
-import           Control.Concurrent             (forkOS)
-import           System.Directory
-import           System.FilePath.Posix
-import           System.IO
-import qualified Data.Map                       as M
+import           Control.Concurrent.STM.TVar
+import           Control.Lens                  hiding (argument, (<.>))
+import           Control.Monad.State
+import           Control.Monad.STM             (atomically)
+import qualified Data.Map                      as M
+import           Data.Maybe
 import           Data.Time.Format
 import           Data.Time.LocalTime
-import qualified DBus
-import qualified DBus.Client as DBus
-import qualified System.Timeout                      as T
+import qualified DBus.Client                   as DBus
+import           System.Directory
+import           System.Exit
+import           System.FilePath.Posix
+import           System.IO
+import           System.Process
+import qualified System.Timeout                as T
 
 
+import           Moonbase.Cli
 import           Moonbase.Core
 import           Moonbase.DBus
-import           Moonbase.Cli
 import           Moonbase.Theme
+
+-- exported stuff
+import qualified Moonbase.Cli                  as Moonbase
+import qualified Moonbase.Core                 as Moonbase
+import qualified Moonbase.DBus                 as Moonbase
+import qualified Moonbase.Theme                as Moonbase
+
+-- Core Implementations --------------------------------------------------------
+
+logMessage :: Handle -> Message -> IO ()
+logMessage handle msg = do
+  date <- formatLogDate
+  hPutStrLn handle $ date ++ ": " ++ show msg
+  where
+    formatLogDate = formatTime defaultTimeLocale rfc822DateFormat <$> getZonedTime
+
+
+-- FIXME: Until directory 1.2.3 is release, wich adds getXdgDirectory support
+--        use this directory
+moonbaseDir ::  IO FilePath
+moonbaseDir = (</>) <$> getHomeDirectory <*> pure "moonbase"
+
+setupHomeDirectory :: IO ()
+setupHomeDirectory = do
+  dir <- moonbaseDir
+  exists <- doesDirectoryExist dir
+  unless exists $ createDirectory dir
+
+openLog :: IO Handle
+openLog = do
+ dir    <- moonbaseDir
+ exists <- doesFileExist (dir </> "moonbase" <.> "log")
+
+ unless exists $ writeFile (dir </> "moonbase" <.> "log") ""
+ openFile (dir </> "moonbase" <.> "log") WriteMode
+
+-- moonbase --------------------------------------------------------------------
 
 moonbase :: MB (Runtime IO) IO () -> IO ()
 moonbase moon = Dy.wrapMain params (Nothing, moon)
@@ -48,8 +85,13 @@ moonbase moon = Dy.wrapMain params (Nothing, moon)
     , Dy.includeCurrentDirectory = True }
 
 realMoonbase :: (Maybe String, MB (Runtime IO) IO ()) -> IO ()
-realMoonbase = undefined
+realMoonbase (Just err, _) = die err
+realMoonbase (Nothing, f)  = runCli $ \verbose -> do
+   client <- connectDBus moonbaseBusName
+   handle <- openLog
+   trigger <- newEmptyTMVarIO
 
+   when (isNothing client) $ die "Connection to DBus failed. Is moonbase already running?"
 
 -- Moon ------------------------------------------------------------------------
 
@@ -60,18 +102,29 @@ instance Moon IO where
   fork    = forkIO
   delay   = threadDelay
   timeout = T.timeout
-
+  exec cmd args = readProcessWithExitCode cmd args ""
 -- Moonbase / Base -------------------------------------------------------------
 data Runtime m = Runtime
-  { _rtHdl       :: Handle
-  , _rtActions   :: M.Map String (Action (Runtime m) m)
-  , _rtTheme     :: Theme
-  , _rtVerbose   :: Bool
-  , _rtTerminal  :: [String] -> MB (Runtime m) m ()
-  , _rtQuit      :: TMVar Bool
-  , _rtDbus      :: DBusClient }
+  { _rtHdl      :: Handle
+  , _rtActions  :: M.Map String (Action (Runtime m) m)
+  , _rtTheme    :: Theme
+  , _rtVerbose  :: Bool
+  , _rtTerminal :: [String] -> MB (Runtime m) m ()
+  , _rtQuit     :: TMVar Bool
+  , _rtDBus     :: DBus.Client }
 
 makeLenses ''Runtime
+
+newRuntime :: Bool -> Handle -> TMVar Bool -> DBus.Client -> Runtime IO
+newRuntime verbose handle trigger client = Runtime
+  { _rtHdl      = handle
+  , _rtActions  = M.empty
+  , _rtTheme    = defaultTheme
+  , _rtVerbose  = verbose
+  , _rtTerminal = defaultTerminal
+  , _rtQuit     = trigger
+  , _rtDBus     = client
+  }
 
 type RWRT = Runtime IO
 type RWMB a = MB RWRT IO a
@@ -112,41 +165,3 @@ unbase :: Base RWRT -> TVar RWRT
 unbase (RWBase rt) = rt
 
 -- Com -------------------------------------------------------------------------
-
--- Core Implementations --------------------------------------------------------
-
-logMessage :: Handle -> Message -> IO ()
-logMessage handle msg = do
-  date <- formatLogDate
-  hPutStrLn handle $ date ++ ": " ++ show msg
-  where
-    formatLogDate = formatTime defaultTimeLocale rfc822DateFormat <$> getZonedTime
-
-
--- FIXME: Until directory 1.2.3 is release, wich adds getXdgDirectory support
---        use this directory
-moonbaseDir ::  IO FilePath
-moonbaseDir = (</>) <$> getHomeDirectory <*> pure "moonbase"
-
-setupHomeDirectory :: IO ()
-setupHomeDirectory = do
-  dir <- moonbaseDir
-  exists <- doesDirectoryExist dir
-  unless exists $ createDirectory dir
-
-openLog :: IO Handle
-openLog = do
- dir    <- moonbaseDir
- exists <- doesFileExist (dir </> "moonbase" <.> "log")
-
- unless exists $ writeFile (dir </> "moonbase" <.> "log") ""
- openFile (dir </> "moonbase" <.> "log") WriteMode
-
-
-startDBus :: IO (Either String DBusClient)
-startDBus = do
-        client <- DBus.connectSession
-        name   <- DBus.requestName client moonbaseBusName []
-        return $ case name of
-            DBus.NamePrimaryOwner -> Right client
-            _                     -> Left "Connection to Session Bus failed. Name allready in use"

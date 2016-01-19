@@ -20,6 +20,7 @@ library
                      , Moonbase.Cli
                      , Moonbase.DBus
                      , Moonbase.Theme
+                     , Moonbase.Util.TH
 
   default-language:    Haskell2010
   build-depends:       base >= 4.7 && < 5
@@ -37,6 +38,7 @@ library
          , dbus
          , vector
          , optparse-applicative
+         , template-haskell
 
          -- this is only here to make atoms haskell-ide happy
          , hspec
@@ -63,6 +65,8 @@ executable moonbase
          , dbus
          , vector
          , optparse-applicative
+         , template-haskell
+         
                      , moonbase
   default-language:    Haskell2010
 
