@@ -2,6 +2,7 @@ module Moonbase.CoreSpec where
 
 import           Control.Lens
 import           Control.Monad.Reader
+import           Data.Time.Clock.POSIX
 
 import qualified Data.Vector as V
 
@@ -104,7 +105,15 @@ test_eval = describe "#eval" $
     runInMoonTest :: (FMT -> MoonTest a) -> IO a
     runInMoonTest f = fst <$> newEvalTest (f =<< get)
 
-
+test_delay :: SpecWith ()
+test_delay = describe "#delay" $
+  it "delay waits for more than n ms" $ do
+    start <- round <$> getPOSIXTime
+    putStrLn $ "start:" ++ show start
+    fake (delay 1000000)
+    end   <- round <$> getPOSIXTime
+    putStrLn $ "end:" ++ show end
+    end - start  `shouldBe` 1
 
 test_mb :: SpecWith ()
 test_mb = describe "MB" $ do
@@ -153,6 +162,15 @@ test_mb = describe "MB" $ do
     defaultImpl :: (Functor f) => a -> f b -> f a
     defaultImpl = fmap . const
 
+test_exec :: SpecWith ()
+test_exec = describe "#exec" $
+  it "should spawn a process" $ do
+    result <- fake $ do
+      allowExec "env" (ExitSuccess, "calling env", "")
+      (_, result, _) <- exec "env" []
+      return result
+    result `shouldBe` "calling env"
+
 
 
 spec :: Spec
@@ -164,3 +182,5 @@ spec = do
   test_moon
   test_mb
   test_eval
+  test_delay
+  test_exec

@@ -14,7 +14,7 @@ module Test.Fake
   , FakeMB
   , evalTest, newEvalTest
   , fake, fakeWith
-  , allowContent, allowAction, allowTerm
+  , allowContent, allowAction, allowTerm, allowExec
   -- Expectations
   , computes
   , isSameAs

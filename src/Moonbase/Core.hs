@@ -21,6 +21,7 @@ module Moonbase.Core
  -- re-imports
  , ask
  , E.throw
+ , ExitCode(..)
  ) where
 
 import           Control.Applicative
