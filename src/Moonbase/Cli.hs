@@ -2,22 +2,22 @@
 
 module Moonbase.Cli where
 
+import           Control.Applicative
+import qualified Control.Exception         as E
+import           Control.Lens              hiding (argument)
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Maybe
-
-import           Control.Applicative
-import           Control.Lens              hiding (argument)
-
-import           Options.Applicative
-
 import           Data.Maybe
-import           Moonbase.DBus
+import           System.Exit
 
 import qualified DBus
 import qualified DBus.Client               as DBus
+import           Options.Applicative
 
-import           System.Exit
+import           Moonbase.DBus
+
+
 
 data Options = Options
   { _verbose :: Bool
@@ -50,14 +50,14 @@ runCommand cmd args = do
 
    when (isNothing client) $ die "Could not connect to DBus"
 
-   reply <- DBus.call (fromJust client) (DBus.methodCall (withObjectPath "Action") (withInterface "Action") (DBus.memberName_ "RunAction"))
+   reply <- DBus.call (fromJust client) (DBus.methodCall (withObjectPath "Action") (withInterface "Action") (DBus.memberName_ "runAction"))
      { DBus.methodCallDestination = Just moonbaseBusName
      , DBus.methodCallBody        = [DBus.toVariant (cmd:args)]
      }
    case reply of
-     Left err    ->  die $ DBus.methodErrorMessage err
+     Left err    ->  die $ "DBus Error: " ++ DBus.methodErrorMessage err
      Right reply ->  case replyValue reply of
-       Nothing -> die "Could not decode moonbase reply. This indicates a bug, report this if the error persists"
+       Nothing -> die "DBus Error: Could not decode moonbase reply. This indicates a bug, report this if the error persists"
        Just x  -> putStrLn x
    where
      replyValue reply    = DBus.fromVariant (head $ DBus.methodReturnBody reply)
@@ -65,6 +65,6 @@ runCommand cmd args = do
 runCli :: (Bool -> IO ()) -> IO ()
 runCli start = do
   options <- parseOptions
-  if options ^. cmd  == "start"
+  if options ^. cmd  == "start" || options ^. cmd == ""
     then start (options ^. verbose)
     else runCommand (options ^. cmd) (options ^. args)

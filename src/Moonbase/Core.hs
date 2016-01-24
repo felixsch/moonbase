@@ -53,7 +53,7 @@ instance Show Exception where
   show Shutdown            = "Bye!"
 
 
---instance E.Exception Exception
+instance E.Exception Exception
 
 data Message = Warning String   -- ^ A warning
              | Info String      -- ^ An information
@@ -83,7 +83,6 @@ class (Moon m) => Moonbase rt m where
   withTheme    :: Theme -> MB rt m ()
   verbose      :: MB rt m Bool
   add          :: String -> Action rt m -> MB rt m ()
-  actions      :: MB rt m (M.Map String (Action rt m))
   terminal     :: [String] -> MB rt m ()
   withTerminal :: ([String] -> MB rt m ()) -> MB rt m ()
   quit         :: MB rt m ()
@@ -96,10 +95,11 @@ data ActionType = ActionCommand
                 deriving (Eq, Show)
 
 data Action rt m = Action
-  { _actionName :: String
-  , _actionHelp :: String
-  , _actionType :: ActionType
-  , _action     :: [String] -> MB rt m String }
+  { _actionName  :: String
+  , _actionHelp  :: String
+  , _actionUsage :: String
+  , _actionType  :: ActionType
+  , _action      :: [String] -> MB rt m String }
 
 -- Moonbase --------------------------------------------------------------------
 

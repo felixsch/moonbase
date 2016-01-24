@@ -16,6 +16,7 @@ import           Control.Concurrent            (forkIO, forkOS, threadDelay)
 import           Control.Concurrent.STM.TMVar
 import           Control.Concurrent.STM.TQueue
 import           Control.Concurrent.STM.TVar
+import qualified Control.Exception             as E
 import           Control.Lens                  hiding (argument, (<.>))
 import           Control.Monad.State
 import           Control.Monad.STM             (atomically)
@@ -23,6 +24,7 @@ import qualified Data.Map                      as M
 import           Data.Maybe
 import           Data.Time.Format
 import           Data.Time.LocalTime
+import qualified DBus
 import qualified DBus.Client                   as DBus
 import           System.Directory
 import           System.Exit
@@ -37,12 +39,6 @@ import           Moonbase.Core
 import           Moonbase.DBus
 import           Moonbase.Theme
 
--- exported stuff
-import qualified Moonbase.Cli                  as Moonbase
-import qualified Moonbase.Core                 as Moonbase
-import qualified Moonbase.DBus                 as Moonbase
-import qualified Moonbase.Theme                as Moonbase
-
 -- Core Implementations --------------------------------------------------------
 
 logMessage :: Handle -> Message -> IO ()
@@ -56,13 +52,17 @@ logMessage handle msg = do
 -- FIXME: Until directory 1.2.3 is release, wich adds getXdgDirectory support
 --        use this directory
 moonbaseDir ::  IO FilePath
-moonbaseDir = (</>) <$> getHomeDirectory <*> pure "moonbase"
+moonbaseDir = (</>) <$> getHomeDirectory <*> pure ".moonbase"
 
 setupHomeDirectory :: IO ()
 setupHomeDirectory = do
   dir <- moonbaseDir
   exists <- doesDirectoryExist dir
-  unless exists $ createDirectory dir
+  putStrLn $ "directory       : " ++ dir
+  putStrLn $ "directory exists: " ++ show exists
+  unless exists $ do
+    putStrLn "Home directory does not exist. Creting ~/.moonbase"
+    createDirectory dir
 
 openLog :: IO Handle
 openLog = do
@@ -71,27 +71,6 @@ openLog = do
 
  unless exists $ writeFile (dir </> "moonbase" <.> "log") ""
  openFile (dir </> "moonbase" <.> "log") WriteMode
-
--- moonbase --------------------------------------------------------------------
-
-moonbase :: MB (Runtime IO) IO () -> IO ()
-moonbase moon = Dy.wrapMain params (Nothing, moon)
-  where
-    params = Dy.defaultParams {
-      Dy.projectName = "moonbase"
-    , Dy.realMain    = realMoonbase
-    , Dy.showError   = \st msg -> st & _1 .~ Just msg
-    , Dy.ghcOpts     = ["-threaded", "-Wall"]
-    , Dy.includeCurrentDirectory = True }
-
-realMoonbase :: (Maybe String, MB (Runtime IO) IO ()) -> IO ()
-realMoonbase (Just err, _) = die err
-realMoonbase (Nothing, f)  = runCli $ \verbose -> do
-   client <- connectDBus moonbaseBusName
-   handle <- openLog
-   trigger <- newEmptyTMVarIO
-
-   when (isNothing client) $ die "Connection to DBus failed. Is moonbase already running?"
 
 -- Moon ------------------------------------------------------------------------
 
@@ -103,19 +82,20 @@ instance Moon IO where
   delay   = threadDelay
   timeout = T.timeout
   exec cmd args = readProcessWithExitCode cmd args ""
+
 -- Moonbase / Base -------------------------------------------------------------
-data Runtime m = Runtime
+data Runtime = Runtime
   { _rtHdl      :: Handle
-  , _rtActions  :: M.Map String (Action (Runtime m) m)
+  , _rtActions  :: M.Map String (Action Runtime IO)
   , _rtTheme    :: Theme
   , _rtVerbose  :: Bool
-  , _rtTerminal :: [String] -> MB (Runtime m) m ()
+  , _rtTerminal :: [String] -> MB Runtime IO ()
   , _rtQuit     :: TMVar Bool
   , _rtDBus     :: DBus.Client }
 
 makeLenses ''Runtime
 
-newRuntime :: Bool -> Handle -> TMVar Bool -> DBus.Client -> Runtime IO
+newRuntime :: Bool -> Handle -> TMVar Bool -> DBus.Client -> Runtime
 newRuntime verbose handle trigger client = Runtime
   { _rtHdl      = handle
   , _rtActions  = M.empty
@@ -126,17 +106,15 @@ newRuntime verbose handle trigger client = Runtime
   , _rtDBus     = client
   }
 
-type RWRT = Runtime IO
-type RWMB a = MB RWRT IO a
 
-instance MonadState RWRT (MB RWRT IO) where
+instance MonadState Runtime (MB Runtime IO) where
   get = io . readTVarIO =<< unbase <$> ask
   put rt = do
     ref <- unbase <$> ask
     io $ atomically $ writeTVar ref rt
 
-instance Moonbase RWRT IO where
-  data Base RWRT = RWBase (TVar RWRT)
+instance Moonbase Runtime IO where
+  data Base Runtime = RWBase (TVar Runtime)
 
   log message    = do
     handle <- use rtHdl
@@ -154,14 +132,125 @@ instance Moonbase RWRT IO where
   withTerminal f  = rtTerminal .= f
 
   add str action  = rtActions . at str ?= action
-  actions         = use rtActions
-
   verbose         = use rtVerbose
   quit            = do
     ref <- use rtQuit
     io $ atomically $ putTMVar ref True
 
-unbase :: Base RWRT -> TVar RWRT
+unbase :: Base Runtime -> TVar Runtime
 unbase (RWBase rt) = rt
 
 -- Com -------------------------------------------------------------------------
+
+instance Com Runtime IO where
+  call     = dbusCall
+  call_    = dbusCall_
+  on       = dbusOn
+  callback = dbusCallback
+
+dbusCall :: Call -> [Variant] -> MB Runtime IO [Variant]
+dbusCall call args = do
+    client <- use rtDBus
+    reply <- io $ E.catch (DBus.call_ client method) $ \e ->
+      E.throw (DBusError (DBus.clientErrorMessage e))
+    return $ DBus.methodReturnBody reply
+    where
+      method = (DBus.methodCall path interface member) {
+        DBus.methodCallBody = args
+        -- FIXME: Add destination
+      }
+      (path, interface, member) = call
+
+dbusCall_ :: Call -> [Variant] -> MB Runtime IO ()
+dbusCall_ c args = void $ dbusCall c args
+
+dbusOn :: (Nameable a) => a -> Help -> Usage -> ([String] -> MB Runtime IO String) -> MB Runtime IO ()
+dbusOn name help usage f = do
+    add key' $ Action name' help usage ActionCommand f
+    ref     <- ask
+    client  <- use rtDBus
+    actions <- use rtActions
+
+    io $ DBus.export client (withObjectPath "Action") $
+      map (actionToMethod ref) $ M.elems actions
+  where
+    (name', key')                          = prepareName name
+    actionToMethod ref (Action name _ _ _ f) =
+      DBus.autoMethod (withInterface "Action") (DBus.memberName_ name) (wrap1 ref f)
+
+wrap1 :: (DBus.IsValue a0) => Base Runtime -> (a0 -> MB Runtime IO b) -> a0 -> IO b
+wrap1 ref f arg0 = eval ref (f arg0)
+
+dbusCallback :: (Signal -> MB Runtime IO ()) -> MB Runtime IO ()
+dbusCallback = undefined
+
+-- basic actions for moonbase --------------------------------------------------
+
+basicActions :: MB Runtime IO ()
+basicActions = do
+  on "quit"
+     "Quit moonbase"
+     ""
+     $ \[] -> do
+      trigger <- use rtQuit
+      io $ atomically $ putTMVar trigger True
+      return "Bye Bye"
+
+  on "commands"
+     "show all available commands"
+     ""
+     $ \_ -> do
+       actions <- M.elems <$> use rtActions
+       return $ unlines $
+         [ "Commands available:"
+         , "" ] ++ concatMap (\(Action name help usage _ _) ->
+           [ "moonbase " ++ name ++ " " ++ usage
+           , "  " ++ help
+           , "" ]) actions
+
+  on "run-action"
+     "run a action in moonbase"
+     "<name> <arg> <arg>..."
+     $ \(name:args) -> do
+      actions <- use rtActions
+      case actions ^? ix name of
+        Just (Action _ _ _ _ f)  -> f args
+        otherwise              -> return "Command not found"
+
+  on "terminal"
+     "spawn a terminal"
+     "[cmd] [arg arg2...]"
+     $ \args -> do
+      term <- use rtTerminal
+      term args
+      return ""
+
+-- moonbase --------------------------------------------------------------------
+
+moonbase :: MB Runtime IO () -> IO ()
+moonbase moon = Dy.wrapMain params (Nothing, moon)
+  where
+    params = Dy.defaultParams {
+      Dy.projectName = "moonbase"
+    , Dy.realMain    = realMoonbase
+    , Dy.showError   = \st msg -> st & _1 .~ Just msg
+    , Dy.ghcOpts     = ["-threaded", "-Wall"]
+    , Dy.includeCurrentDirectory = True }
+
+realMoonbase :: (Maybe String, MB Runtime IO ()) -> IO ()
+realMoonbase (Just err, _) = die err
+realMoonbase (Nothing, f)  = runCli $ \verbose -> do
+   setupHomeDirectory
+   client <- connectDBus moonbaseBusName
+   handle <- openLog
+   trigger <- newEmptyTMVarIO
+
+   when (isNothing client) $ die "Connection to DBus failed. Is moonbase already running?"
+
+   runtime <- newTVarIO (newRuntime verbose handle trigger (fromJust client))
+
+   eval (RWBase runtime) $ do
+     basicActions
+     puts "Moonbase started..."
+     io $ atomically $ takeTMVar trigger
+     puts "Moonbase shutdown..."

@@ -7,10 +7,11 @@ module Moonbase.DBus
   ( Call
   , Signal
   , Help
+  , Usage
   , Com(..)
   , Nameable(..)
   , withoutHelp
-  , sanatizeName
+  , packName, unpackName
   , moonbaseBusName
   , moonbaseCliBusName
   , moonbaseInterfaceName
@@ -35,7 +36,7 @@ import           Control.Monad.State
 import qualified DBus
 import qualified DBus.Client                 as DBus
 
-import           Data.Char                   (toLower, toUpper)
+import           Data.Char                   (toLower, isUpper, toUpper)
 import qualified Data.Map                    as M
 import           Data.Maybe
 
@@ -46,34 +47,40 @@ import           Moonbase.Core
 type Call     = (DBus.ObjectPath, DBus.InterfaceName, DBus.MemberName)
 type Signal   = String
 type Help     = String
+type Usage    = String
 
 class (Moonbase rt m) => Com rt m where
   call     :: Call -> [DBus.Variant] -> MB rt m [DBus.Variant]
   call_    :: Call -> [DBus.Variant] -> MB rt m ()
-  on       :: (Nameable a) => a -> Help -> ([String] -> MB rt m String) -> MB rt m ()
+  on       :: (Nameable a) => a -> Help -> Usage -> ([String] -> MB rt m String) -> MB rt m ()
   callback :: (Signal -> MB rt m ()) -> MB rt m ()
 
 class Nameable a where
   prepareName :: a -> (String, String)
 
 instance Nameable String where
-  prepareName n = (sanatizeName n, lower)
+  prepareName n = (packName n, lower)
     where
       lower = map toLower n
 
 instance Nameable (String, String) where
-  prepareName (n, a) = (sanatizeName n, a)
+  prepareName (n, a) = (packName n, a)
 
 withoutHelp :: String
 withoutHelp = "No help is available."
 
-sanatizeName :: String -> String
-sanatizeName []       = []
-sanatizeName (' ':xs) = sanatizeName xs
-sanatizeName ('-':x:xs) = toUpper x : sanatizeName xs
-sanatizeName ('_':x:xs) = toUpper x : sanatizeName xs
-sanatizeName (x:xs)     = x : sanatizeName xs
+packName :: String -> String
+packName []       = []
+packName (' ':xs) = packName xs
+packName ('-':x:xs) = toUpper x : packName xs
+packName ('_':x:xs) = toUpper x : packName xs
+packName (x:xs)     = x : packName xs
 
+unpackName :: String -> String
+unpackName [] = []
+unpackName (x:xs)
+  | isUpper x = '-' : toLower x : unpackName xs
+  | otherwise = x : unpackName xs
 
 moonbaseBusName :: DBus.BusName
 moonbaseBusName = "org.moonbase"
