@@ -36,7 +36,7 @@ import           Control.Monad.State
 import qualified DBus
 import qualified DBus.Client                 as DBus
 
-import           Data.Char                   (toLower, isUpper, toUpper)
+import           Data.Char                   (isUpper, toLower, toUpper)
 import qualified Data.Map                    as M
 import           Data.Maybe
 

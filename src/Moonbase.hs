@@ -239,7 +239,7 @@ moonbase moon = Dy.wrapMain params (Nothing, moon)
 
 realMoonbase :: (Maybe String, MB Runtime IO ()) -> IO ()
 realMoonbase (Just err, _) = die err
-realMoonbase (Nothing, f)  = runCli $ \verbose -> do
+realMoonbase (Nothing, runConf)  = runCli $ \verbose -> do
    setupHomeDirectory
    client <- connectDBus moonbaseBusName
    handle <- openLog
@@ -252,5 +252,6 @@ realMoonbase (Nothing, f)  = runCli $ \verbose -> do
    eval (RWBase runtime) $ do
      basicActions
      puts "Moonbase started..."
+     runConf
      io $ atomically $ takeTMVar trigger
      puts "Moonbase shutdown..."

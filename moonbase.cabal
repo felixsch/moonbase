@@ -39,6 +39,8 @@ library
          , vector
          , optparse-applicative
          , template-haskell
+         , gtk3
+         , glib
 
          -- this is only here to make atoms haskell-ide happy
          , hspec
