@@ -2,7 +2,7 @@ language: c
 sudo: false
 
 env:
-  - GHCVER=7.10.3 STACK_YAML=stack.yaml CABALVER=1.22
+  - GHCVER=7.10.2 STACK_YAML=stack.yaml CABALVER=1.22
 
 addons:
   apt:
@@ -10,7 +10,7 @@ addons:
       hvr-ghc
     packages:
       - cabal-install-1.22
-      - ghc-7.10.3
+      - ghc-7.10.2
       - libgtk-3-dev
 
 cache:
@@ -32,7 +32,7 @@ script:
   - stack test --no-terminal --coverage
 
 after_script:
-  - travis_retry curl -L https://github.com/rubik/stack-hpc-coveralls/releases/download/v0.0.3.0/shc-linux-x64-$GHCVER.tar.bz2 | tar -xj
+  - travis_retry curl -L https://github.com/rubik/stack-hpc-coveralls/releases/download/v0.0.3.0/shc-linux-x64-7.10.2.tar.bz2 | tar -xj
   - ./shc moonbase test
 
 notifications:
