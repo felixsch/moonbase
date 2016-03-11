@@ -9,10 +9,9 @@ addons:
     sources:
       hvr-ghc
     packages:
-      cabal-install-1.22
-      ghc-7.10.3
-      libgtk-3-dev
-      libgmp-dev
+      - cabal-install-1.22
+      - ghc-7.10.3
+      - libgtk-3-dev
 
 cache:
   directories:
