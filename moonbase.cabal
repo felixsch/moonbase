@@ -51,6 +51,12 @@ executable moonbase
   hs-source-dirs:      src
   main-is:             Main.hs
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+
+  other-modules:  Moonbase
+                , Moonbase.Cli
+                , Moonbase.Core
+                , Moonbase.DBus
+                , Moonbase.Theme
   build-depends:       base
 
          , lens

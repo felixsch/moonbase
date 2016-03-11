@@ -52,7 +52,7 @@ logMessage handle msg = do
 -- FIXME: Until directory 1.2.3 is release, wich adds getXdgDirectory support
 --        use this directory
 moonbaseDir ::  IO FilePath
-moonbaseDir = (</>) <$> getHomeDirectory <*> pure ".moonbase"
+moonbaseDir = (</>) <$> getHomeDirectory <*> pure ".config/moonbase"
 
 setupHomeDirectory :: IO ()
 setupHomeDirectory = do
@@ -61,7 +61,7 @@ setupHomeDirectory = do
   putStrLn $ "directory       : " ++ dir
   putStrLn $ "directory exists: " ++ show exists
   unless exists $ do
-    putStrLn "Home directory does not exist. Creting ~/.moonbase"
+    putStrLn "Home directory does not exist. Creating ~/.config/moonbase"
     createDirectory dir
 
 openLog :: IO Handle
@@ -233,12 +233,13 @@ moonbase moon = Dy.wrapMain params (Nothing, moon)
     params = Dy.defaultParams {
       Dy.projectName = "moonbase"
     , Dy.realMain    = realMoonbase
+    , Dy.configDir   = Just moonbaseDir
     , Dy.showError   = \st msg -> st & _1 .~ Just msg
     , Dy.ghcOpts     = ["-threaded", "-Wall"]
     , Dy.includeCurrentDirectory = True }
 
 realMoonbase :: (Maybe String, MB Runtime IO ()) -> IO ()
-realMoonbase (Just err, _) = die err
+realMoonbase (Just err, _) = putStrLn "Compiling failed!" >> die err
 realMoonbase (Nothing, runConf)  = runCli $ \verbose -> do
    setupHomeDirectory
    client <- connectDBus moonbaseBusName
