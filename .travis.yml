@@ -2,9 +2,7 @@ language: c
 sudo: false
 
 env:
-  - GHCVER=7.10.3
-  - STACK_YAML=stack.yaml
-  - CABALVER=1.22
+  - GHCVER=7.10.3 STACK_YAML=stack.yaml CABALVER=1.22
 
 addons:
   apt:
