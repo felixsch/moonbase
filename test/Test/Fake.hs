@@ -132,7 +132,6 @@ instance Moonbase FMT MoonTest where
   withTheme _ = requireTheme .= True
   verbose   = return False
   add n _   = allActions . at n ?= True
-  actions   = use allowedActions
   terminal  = selectTerminal
   withTerminal _ = return () -- FIXME
   quit     = quitSignal .= True

@@ -80,6 +80,7 @@ test_action = describe "Action" $ do
   where
     a = Action { _actionName = "foo"
                , _actionHelp = "bar"
+               , _actionUsage = "usage"
                , _actionType = ActionRaw
                , _action     = actionF }
     actionF :: [String] -> FakeMB String
