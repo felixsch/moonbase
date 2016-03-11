@@ -12,6 +12,7 @@ addons:
       cabal-install-$CABALVER
       ghc-$GHCVER
       libgtk-3-dev
+      libgmp-dev
 
 cache:
   directories:
