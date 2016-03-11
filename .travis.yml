@@ -29,11 +29,12 @@ install:
   - stack setup --no-terminal
 
 script:
-  - stack test --no-terminal --coverage
+  - stack build
+  - stack test :hspec --coverage --ghc-options "-fforce-recomp"
 
 after_script:
   - travis_retry curl -L https://github.com/rubik/stack-hpc-coveralls/releases/download/v0.0.3.0/shc-linux-x64-7.10.2.tar.bz2 | tar -xj
-  - ./shc moonbase test
+  - ./shc moonbase hspec
 
 notifications:
   email: false
