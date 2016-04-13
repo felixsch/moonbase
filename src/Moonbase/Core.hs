@@ -85,7 +85,7 @@ class (Moon m) => Moonbase rt m where
   add          :: String -> Action rt m -> MB rt m ()
   terminal     :: [String] -> MB rt m ()
   withTerminal :: ([String] -> MB rt m ()) -> MB rt m ()
-  quit         :: MB rt m ()
+  quit         :: ExitCode -> MB rt m ()
 
 -- Actions ---------------------------------------------------------------------
 

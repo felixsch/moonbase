@@ -7,4 +7,4 @@ main = moonbase $ do
   puts "Test Moonbase"
   delay 200000
   puts "Haha"
-  quit
+  quit (ExitFailure 12)

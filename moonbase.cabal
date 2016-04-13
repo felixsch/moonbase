@@ -20,7 +20,10 @@ library
                      , Moonbase.Cli
                      , Moonbase.DBus
                      , Moonbase.Theme
+                     , Moonbase.DisplayManager
+                     , Moonbase.WindowManager
                      , Moonbase.Util.TH
+                     , Moonbase.Util.ErrorT
 
   default-language:    Haskell2010
   build-depends:       base >= 4.7 && < 5
@@ -29,6 +32,7 @@ library
          , containers
          , transformers
          , mtl
+         , either
          , stm
          , directory
          , filepath
@@ -38,9 +42,15 @@ library
          , dbus
          , vector
          , optparse-applicative
+         , parsec
          , template-haskell
+
          , gtk3
          , glib
+
+         , xmonad
+         , xmonad-contrib
+         , X11
 
          -- this is only here to make atoms haskell-ide happy
          , hspec
@@ -68,6 +78,8 @@ executable moonbase
          , vector
          , optparse-applicative
          , template-haskell
+         
+         , xmonad
 
                      , moonbase
   default-language:    Haskell2010

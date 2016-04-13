@@ -1,0 +1,56 @@
+#!/bin/bash
+
+moonbase_path=".stack-work/dist/x86_64-linux/Cabal-1.22.6.0/build/moonbase/"
+xephyr="Xephyr -ac -br -noreset +xinerama -screen 1600x900 -screen 1600x900 :7.0"
+
+
+function run_xephyr() {
+  $xephyr &
+  sleep 3
+}
+
+function run_moonbase() {
+    DISPLAY=:7.0 dbus-launch stack exec moonbase
+}
+
+function kill_xephyr() {
+    for pid in $(ps x | grep "$xephyr" | awk '{print $1}'); do
+        echo "Xephyr process found. Killing...."
+        kill -9 $pid
+    done 
+}
+
+function watch_loop() {
+    local pid=0
+    while true; do
+        change=$(inotifywait -e close_write,moved_to,create $moonbase_path)
+ 
+        echo "CHANGED : $change"
+        if [ "$change" == "$moonbase_path CREATE moonbase" ]; then
+            if [ "x$pid_moonbase" != "x" ]; then
+                kill -9 $pid_moonbase
+                sleep 2
+            fi
+
+            kill_xephyr
+            run_xephyr
+            
+
+            run_moonbase &
+            pid=$!
+        fi
+    done
+}
+
+function run() {
+  kill_xephyr
+  run_xephyr
+  run_moonbase
+  kill_xephyr
+}
+
+case $1 in
+    watch|w) watch_loop;;
+    *) run;;
+esac
+

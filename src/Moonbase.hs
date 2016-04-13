@@ -90,12 +90,12 @@ data Runtime = Runtime
   , _rtTheme    :: Theme
   , _rtVerbose  :: Bool
   , _rtTerminal :: [String] -> MB Runtime IO ()
-  , _rtQuit     :: TMVar Bool
+  , _rtQuit     :: TMVar ExitCode
   , _rtDBus     :: DBus.Client }
 
 makeLenses ''Runtime
 
-newRuntime :: Bool -> Handle -> TMVar Bool -> DBus.Client -> Runtime
+newRuntime :: Bool -> Handle -> TMVar ExitCode -> DBus.Client -> Runtime
 newRuntime verbose handle trigger client = Runtime
   { _rtHdl      = handle
   , _rtActions  = M.empty
@@ -133,9 +133,9 @@ instance Moonbase Runtime IO where
 
   add str action  = rtActions . at str ?= action
   verbose         = use rtVerbose
-  quit            = do
+  quit exitCode   = do
     ref <- use rtQuit
-    io $ atomically $ putTMVar ref True
+    io $ atomically $ putTMVar ref exitCode
 
 unbase :: Base Runtime -> TVar Runtime
 unbase (RWBase rt) = rt
@@ -193,7 +193,7 @@ basicActions = do
      ""
      $ \[] -> do
       trigger <- use rtQuit
-      io $ atomically $ putTMVar trigger True
+      io $ atomically $ putTMVar trigger ExitSuccess
       return "Bye Bye"
 
   on "commands"
@@ -250,8 +250,10 @@ realMoonbase (Nothing, runConf)  = runCli $ \verbose -> do
    runtime <- newTVarIO (newRuntime verbose handle trigger (fromJust client))
 
    eval (RWBase runtime) $ do
-     basicActions
+     basicActionsBool
      puts "Moonbase started..."
      runConf
-     io $ atomically $ takeTMVar trigger
-     puts "Moonbase shutdown..."
+     exitCode <- io $ atomically $ takeTMVar trigger
+     when (exitCode == ExitSuccess) $ puts "Moonbase shutdown..."
+     io $ exitWith exitCode
+
