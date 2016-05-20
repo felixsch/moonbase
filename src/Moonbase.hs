@@ -52,7 +52,7 @@ logMessage handle msg = do
 -- FIXME: Until directory 1.2.3 is release, wich adds getXdgDirectory support
 --        use this directory
 moonbaseDir ::  IO FilePath
-moonbaseDir = (</>) <$> getHomeDirectory <*> pure ".moonbase"
+moonbaseDir = (</>) <$> getHomeDirectory <*> pure ".config/moonbase"
 
 setupHomeDirectory :: IO ()
 setupHomeDirectory = do
@@ -61,7 +61,7 @@ setupHomeDirectory = do
   putStrLn $ "directory       : " ++ dir
   putStrLn $ "directory exists: " ++ show exists
   unless exists $ do
-    putStrLn "Home directory does not exist. Creting ~/.moonbase"
+    putStrLn $ "Home directory does not exist. Creating " ++ dir
     createDirectory dir
 
 openLog :: IO Handle
@@ -81,7 +81,7 @@ instance Moon IO where
   fork    = forkIO
   delay   = threadDelay
   timeout = T.timeout
-  exec cmd args = readProcessWithExitCode cmd args ""
+  exec cmd args = spawnProcess cmd args
 
 -- Moonbase / Base -------------------------------------------------------------
 data Runtime = Runtime
@@ -147,6 +147,7 @@ instance Com Runtime IO where
   call_    = dbusCall_
   on       = dbusOn
   callback = dbusCallback
+  emit     = dbusEmit
 
 dbusCall :: Call -> [Variant] -> MB Runtime IO [Variant]
 dbusCall call args = do
@@ -176,13 +177,43 @@ dbusOn name help usage f = do
   where
     (name', key')                          = prepareName name
     actionToMethod ref (Action name _ _ _ f) =
-      DBus.autoMethod (withInterface "Action") (DBus.memberName_ name) (wrap1 ref f)
+      DBus.autoMethod (withInterface "Action") (DBus.memberName_ $ packName name) (wrap1 ref f)
 
 wrap1 :: (DBus.IsValue a0) => Base Runtime -> (a0 -> MB Runtime IO b) -> a0 -> IO b
 wrap1 ref f arg0 = eval ref (f arg0)
 
-dbusCallback :: (Signal -> MB Runtime IO ()) -> MB Runtime IO ()
-dbusCallback = undefined
+
+unpackSignal :: Signal -> [String]
+unpackSignal = mapMaybe fromVariant . signalBody
+
+
+dbusCallback :: (Nameable a) => a -> ([String] -> MB Runtime IO ()) -> MB Runtime IO SignalHandler
+dbusCallback n f = do
+  ref <- ask
+  client <- use rtDBus
+
+  io $ DBus.addMatch client rule (wrapSig ref f)
+  where
+    wrapSig ref f sig = eval ref (f $ unpackSignal sig)
+    (name', _) = prepareName n
+    rule = DBus.matchAny
+      { DBus.matchSender = Nothing
+      , DBus.matchDestination = Nothing
+      , DBus.matchPath = Just $ withObjectPath "Callbacks"
+      , DBus.matchInterface = Just $ withInterface "Callbacks"
+      , DBus.matchMember = Just $ DBus.memberName_ (packName name') }
+
+dbusEmit :: String -> [String] -> MB Runtime IO ()
+dbusEmit name args = do
+  client <- use rtDBus
+  io $ DBus.emit client sigWithArgs
+  where
+    sig = DBus.signal (withObjectPath "Callbacks")
+                      (withInterface "Callbacks")
+                      (withMemberName (packName name))
+    sigWithArgs = sig { signalBody = map toVariant args }
+
+
 
 -- basic actions for moonbase --------------------------------------------------
 
@@ -234,7 +265,7 @@ moonbase moon = Dy.wrapMain params (Nothing, moon)
       Dy.projectName = "moonbase"
     , Dy.realMain    = realMoonbase
     , Dy.showError   = \st msg -> st & _1 .~ Just msg
-    , Dy.ghcOpts     = ["-threaded", "-Wall"]
+    , Dy.ghcOpts     = ["-threaded"]
     , Dy.includeCurrentDirectory = True }
 
 realMoonbase :: (Maybe String, MB Runtime IO ()) -> IO ()
@@ -250,9 +281,9 @@ realMoonbase (Nothing, runConf)  = runCli $ \verbose -> do
    runtime <- newTVarIO (newRuntime verbose handle trigger (fromJust client))
 
    eval (RWBase runtime) $ do
-     basicActionsBool
+     basicActions
      puts "Moonbase started..."
-     runConf
+     fork runConf
      exitCode <- io $ atomically $ takeTMVar trigger
      when (exitCode == ExitSuccess) $ puts "Moonbase shutdown..."
      io $ exitWith exitCode

@@ -9,9 +9,11 @@ module Moonbase.Core
  , Moon(..)
  , Moonbase(..)
  , MB(..)
+ , terminal_
  , moon
  , eval
  , spawn
+ , spawn_
  , defaultTerminal
  , Message(..)
  , ActionType(..)
@@ -22,6 +24,7 @@ module Moonbase.Core
  , ask
  , E.throw
  , ExitCode(..)
+ , ProcessHandle
  ) where
 
 import           Control.Applicative
@@ -74,7 +77,7 @@ class Monad m => Moon m where
   fork    :: m () -> m ThreadId
   delay   :: Int -> m ()
   timeout :: Int -> m a -> m (Maybe a)
-  exec    :: String -> [String] -> m (ExitCode, String, String)
+  exec    :: String -> [String] -> m ProcessHandle
 
 class (Moon m) => Moonbase rt m where
   data Base rt :: *
@@ -86,6 +89,9 @@ class (Moon m) => Moonbase rt m where
   terminal     :: [String] -> MB rt m ()
   withTerminal :: ([String] -> MB rt m ()) -> MB rt m ()
   quit         :: ExitCode -> MB rt m ()
+
+terminal_ :: (Moonbase rt m) => MB rt m ()
+terminal_ = terminal []
 
 -- Actions ---------------------------------------------------------------------
 
@@ -130,12 +136,15 @@ instance (Moonbase rt m) => Moon (MB rt m) where
 eval :: (Moonbase rt m) => Base rt -> MB rt m a -> m a
 eval ref (MB f) = runReaderT f ref
 
-spawn :: (Moonbase rt m) => String -> [String] -> MB rt m (ExitCode, String, String)
+spawn :: (Moonbase rt m) => String -> [String] -> MB rt m (Maybe ProcessHandle)
 spawn cmd args = do
   mpath <- io $ findExecutable cmd
   case mpath of
-    Just path -> exec cmd args
-    Nothing   -> return (ExitFailure 255, "", "Could not find executable: " ++ cmd ++ " (args: " ++ show args ++ ")")
+    Just path -> Just <$> exec cmd args
+    Nothing   -> return Nothing
+
+spawn_ :: (Moonbase rt m) => String -> [String] -> MB rt m ()
+spawn_ cmd args = void $ spawn cmd args
 
 defaultTerminal :: (Moonbase rt m) => [String] -> MB rt m ()
 defaultTerminal []   = void $ spawn "xterm" []

@@ -20,10 +20,15 @@ library
                      , Moonbase.Cli
                      , Moonbase.DBus
                      , Moonbase.Theme
-                     , Moonbase.DisplayManager
                      , Moonbase.WindowManager
+                     , Moonbase.Util
                      , Moonbase.Util.TH
                      , Moonbase.Util.ErrorT
+                     , Moonbase.Workspace
+                     , Moonbase.DisplayManager
+                     , Moonbase.WindowManager.XMonad
+
+  other-modules:       Moonbase.WindowManager.XMonad.Impl
 
   default-language:    Haskell2010
   build-depends:       base >= 4.7 && < 5
@@ -78,11 +83,21 @@ executable moonbase
          , vector
          , optparse-applicative
          , template-haskell
-         
+        
+         , X11
          , xmonad
-
-                     , moonbase
+         , xmonad-contrib
+         , moonbase
   default-language:    Haskell2010
+  other-modules:         Moonbase
+                       , Moonbase.Cli
+                       , Moonbase.Core
+                       , Moonbase.DBus
+                       , Moonbase.Theme
+                       , Moonbase.WindowManager
+                       , Moonbase.WindowManager.XMonad
+                       , Moonbase.WindowManager.XMonad.Impl
+                       , Moonbase.Workspace
 
 test-suite hspec
   type:                exitcode-stdio-1.0
@@ -100,6 +115,8 @@ test-suite hspec
                      , QuickCheck
                      , time
                      , vector
+                     , xmonad
+                     , xmonad-contrib
                      , moonbase
 
   default-language:    Haskell2010

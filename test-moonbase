@@ -1,16 +1,21 @@
 #!/bin/bash
 
 moonbase_path=".stack-work/dist/x86_64-linux/Cabal-1.22.6.0/build/moonbase/"
-xephyr="Xephyr -ac -br -noreset +xinerama -screen 1600x900 -screen 1600x900 :7.0"
+xephyr="Xephyr -ac -br -noreset +xinerama -screen 1600x900 :7.0"
+xephyr_dual="Xephyr -ac -br -noreset +xinerama -screen 1600x900 -screen 1600x900 :7.0"
 
 
 function run_xephyr() {
-  $xephyr &
+  if [ "x$1" == "xdual" ]; then
+    $xephyr_dual &
+  else
+    $xephyr &
+  fi
   sleep 3
 }
 
 function run_moonbase() {
-    DISPLAY=:7.0 dbus-launch stack exec moonbase
+    DISPLAY=:7.0 dbus-launch stack exec -- moonbase --verbose
 }
 
 function kill_xephyr() {
